@@ -17,9 +17,9 @@
 #include "hookman.h"
 #include "profile.h"
 #define MAX_ENTRY 0x40
-#include <richedit.h>
+//#include <richedit.h>
 WCHAR user_entry[0x40];
-static LPWSTR init_message=L"Interactive Text Hooker 2.2 (2011.4.23) - kaosu@hongfire\r\n";
+static LPWSTR init_message=L"Interactive Text Hooker 2.2 (2011.5.2) - kaosu@hongfire\r\n";
 static BYTE null_buffer[4]={0,0,0,0};
 static BYTE static_small_buffer[0x100];
 extern BYTE* static_large_buffer;
@@ -97,15 +97,8 @@ void CALLBACK NewLineBuff(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime)
 	KillTimer(hwnd,idEvent);
 	TextThread *id=(TextThread*)idEvent;
 			
-	/*if (id->Status()&USING_UNICODE)
-		id->AddToStore((BYTE*)L"\r\n\r\n",8,true);
-	else
-		id->AddToStore((BYTE*)"\r\n\r\n",4,true);*/
 	if (id->Status()&CURRENT_SELECT)
-	{
-		id->CopyLastToClipboard();
 		texts->SetLine();
-	}
 	id->SetNewLineFlag();
 }
 void CALLBACK NewLineConsole(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime)
@@ -290,8 +283,32 @@ TextThread* ThreadTable::FindThread(DWORD number)
 	else return 0;
 }
 
-int TCmp::operator()(const ThreadParameter* t1, const ThreadParameter* t2)
+__forceinline int TCmp::operator()(const ThreadParameter* t1, const ThreadParameter* t2)
 {
+	/*__asm
+	{
+		mov ecx,t1
+		mov edx,t2
+		mov eax,[ecx]
+		sub eax,[edx]
+		jnz _not_equal
+		mov eax,[ecx+4]
+		sub eax,[edx+4]
+		jnz _not_equal
+		mov eax,[ecx+8]
+		sub eax,[edx+8]
+		jnz _not_equal
+		mov eax,[ecx+0xC]
+		sub eax,[edx+0xC]
+		jz _final
+_not_equal:
+		mov ecx,eax
+		sar eax,31
+		neg ecx
+		shr ecx,31
+		or eax,ecx
+_final:
+	}*/
 	DWORD t;
 	t=t1->pid-t2->pid;
 	if (t==0)
@@ -1203,6 +1220,8 @@ _again:
 }
 void TextThread::AddLineBreak()
 {
+	if (status&CURRENT_SELECT)
+		CopyLastToClipboard();
 	if (status&BUFF_NEWLINE)
 	{
 		prev_sentence=last_sentence;
@@ -1210,17 +1229,12 @@ void TextThread::AddLineBreak()
 		if (status&USING_UNICODE)
 		{
 			MyVector::AddToStore((BYTE*)L"\r\n\r\n",8);
-			//*(DWORD*)(storage+used)=0xA000D;
-			//*(DWORD*)(storage+used+4)=0xA000D;			
-			//used+=8;			
 			if (status&CURRENT_SELECT)
 				texts->AddText((BYTE*)L"\r\n\r\n",8,true);
 		}
 		else
 		{
 			MyVector::AddToStore((BYTE*)"\r\n\r\n",4);
-			//*(DWORD*)(storage+used)=0xA0D0A0D;
-			//used+=4;
 			if (status&CURRENT_SELECT)
 				texts->AddText((BYTE*)"\r\n\r\n",4,true);
 		}
@@ -1264,10 +1278,7 @@ void TextThread::AddToStore(BYTE* con,int len, bool new_line,bool console)
 	}
 	else
 	{
-		if (console)
-			timer=SetTimer(hMainWnd,(UINT_PTR)this,split_time,NewLineConsole);
-		else
-			timer=SetTimer(hMainWnd,(UINT_PTR)this,split_time,NewLineBuff);
+		SetNewLineTimer();
 		if (link)
 		{
 			BYTE* send=con;
@@ -1290,6 +1301,7 @@ void TextThread::AddToStore(BYTE* con,int len, bool new_line,bool console)
 				}
 				link->AddToStore(send,l);
 			}
+			link->SetNewLineTimer();
 			if (send!=con) delete send;
 		}
 		sentence_length+=len;
@@ -1403,20 +1415,24 @@ void TextThread::CopyLastSentence(LPWSTR str)
 			}
 			if (i>=j)
 			{
-				l=used-i-8;
+				l=used-i;
 				if (i>j) l-=4;			
 				j=4;
 			}
 			else
 			{
 				i+=2;
-				l=used-i-8;
+				l=used-i;
 				j=0;
 			}
 			memcpy(str,storage+i+j,l);
 			str[l>>1]=0;
 		}
-		else str[0]=0;
+		else 
+		{
+			memcpy(str,storage,used);
+			str[used>>1]=0;
+		}
 	}
 	else
 	{
@@ -1429,14 +1445,14 @@ void TextThread::CopyLastSentence(LPWSTR str)
 			}
 			if (i>=j)
 			{
-				l=used-i-4;
+				l=used-i;
 				if (i>j) l-=4;
 				j=4;
 			}
 			else
 			{
 				i++;
-				l=used-i-4;
+				l=used-i;
 				j=0;
 			}
 			char* buff=new char[(l|0xF)+1];
@@ -1445,7 +1461,11 @@ void TextThread::CopyLastSentence(LPWSTR str)
 			str[MB_WC(buff,str)]=0;
 			delete buff;
 		}
-		else str[0]=0;
+		else 
+		{
+			storage[used]=0;
+			str[MB_WC((char*)storage,str)]=0;
+		}
 	}
 }
 void TextThread::CopyLastToClipboard()
@@ -1457,6 +1477,19 @@ void TextThread::SetComment(LPWSTR str)
 	if (comment) delete comment;
 	comment=new WCHAR[wcslen(str)+1];
 	wcscpy(comment,str);
+}
+void TextThread::SetNewLineFlag()
+{
+	status|=BUFF_NEWLINE;
+	/*if (status&CURRENT_SELECT)
+		CopyLastToClipboard();*/
+}
+void TextThread::SetNewLineTimer()
+{
+	if (number==0)
+		timer=SetTimer(hMainWnd,(UINT_PTR)this,split_time,NewLineConsole);
+	else
+		timer=SetTimer(hMainWnd,(UINT_PTR)this,split_time,NewLineBuff);
 }
 bool TextThread::AddToCombo()
 {
@@ -1488,7 +1521,7 @@ bool TextThread::CheckCycle(TextThread* start)
 	if (link==0) return false;
 	return link->CheckCycle(start);
 }
-inline void TextThread::SetNewLineFlag() {status|=BUFF_NEWLINE;}
+
 inline void TextThread::SetRepeatFlag() {status|=CYCLIC_REPEAT;}
 inline void TextThread::ClearNewLineFlag() {status&=~BUFF_NEWLINE;}
 inline void TextThread::ClearRepeatFlag() {status&=~CYCLIC_REPEAT;}
@@ -1515,7 +1548,7 @@ void CopyToClipboard(void* str,bool unicode, int len)
 	if (clipboard_flag)
 	if (str)
 	{
-		int size=(len*2+0x10)&~0xF;
+		int size=(len*2|0xF)+1;
 		if (len>=0x3FE) return;
 		memcpy(clipboard_buffer,str,len);
 		*(WORD*)(clipboard_buffer+len)=0;
@@ -1641,3 +1674,4 @@ void GetCode(const HookParam& hp, LPWSTR buffer, DWORD pid)
 		ptr+=swprintf(ptr,L"@%X",hp.addr);
 
 }
+void AddLink(WORD from, WORD to) {man->AddLink(from,to);}

@@ -23,12 +23,13 @@
 #define HOOK_BUFFER_SIZE (MAX_HOOK*sizeof(TextHook))
 //#define MAX_HOOK (HOOK_BUFFER_SIZE/sizeof(TextHook))
 WCHAR dll_mutex[0x100];
+WCHAR dll_name[0x100];
 WCHAR hm_mutex[0x100];
 WCHAR hm_section[0x100];
 HINSTANCE hDLL;
 HANDLE hSection;
-bool running,live=false,trigger=false;
-int current_hook=0,user_hook_count=0;
+bool running,live=false;
+int current_hook=0,user_hook_count=0,trigger=0;
 HANDLE hSendThread,hCmdThread,hFile,hMutex,hmMutex;
 DWORD hook_buff_len=HOOK_BUFFER_SIZE;
 //DWORD current_process_id;
@@ -128,7 +129,9 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 		hSection=IthCreateSection(hm_section,0x2000,PAGE_EXECUTE_READWRITE);	
 		NtMapViewOfSection(hSection,NtCurrentProcess(),(PVOID*)&hookman,0,
 			hook_buff_len,0,&hook_buff_len,ViewUnmap,0,PAGE_EXECUTE_READWRITE);
-		swprintf(dll_mutex,L"ITH_%.4d_%s",current_process_id,current_dir);
+		wcscpy(dll_name,current_dir);
+		//swprintf(dll_mutex,L"ITH_%.4d_%s",current_process_id,current_dir);
+		swprintf(dll_mutex,L"ITH_%d",current_process_id);
 		swprintf(hm_mutex,L"ITH_HOOKMAN_%d",current_process_id);
 		hmMutex=IthCreateMutex(hm_mutex,0);
 		hMutex=IthCreateMutex(dll_mutex,1,&s);

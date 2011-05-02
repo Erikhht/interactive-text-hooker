@@ -106,7 +106,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <TargetMachine>MachineX86</TargetMachine>
-      <AdditionalDependencies>..\cryptdll.lib;..\msvcrt.lib;..\ntdllp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>..\msvcrt.lib;..\ntdllp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>

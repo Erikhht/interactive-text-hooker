@@ -51,6 +51,7 @@ int sscanf(const char * _String, const char * _Format, ...);
 #define ENGINE_ABEL 25
 #define ENGINE_LIVE 26
 #define ENGINE_FRONTWING 27
+#define ENGINE_BRUNS 28
 
 #define USING_STRING			0x1
 #define USING_UNICODE		0x2

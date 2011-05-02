@@ -139,7 +139,9 @@ void TextHook::Send(DWORD dwDataBase, DWORD dwRetn)
 	dwAddr=hp.addr;
 	if (trigger)
 	{
-		InsertDynamicHook((LPVOID)dwAddr,*(DWORD*)(dwDataBase-0x1C),*(DWORD*)(dwDataBase-0x18));
+		if (InsertDynamicHook)
+			trigger=InsertDynamicHook((LPVOID)dwAddr,*(DWORD*)(dwDataBase-0x1C),*(DWORD*)(dwDataBase-0x18));
+		else trigger=false;
 	}
 	dwDataIn=*(DWORD*)(dwDataBase+hp.off);
 	if (dwType&EXTERN_HOOK) 

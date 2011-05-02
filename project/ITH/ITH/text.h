@@ -74,6 +74,8 @@ public:
 	bool AddToCombo();
 	bool RemoveFromCombo();
 	bool CheckCycle(TextThread* start);
+	void SetNewLineFlag();
+	void SetNewLineTimer();
 	inline DWORD PID() const {return tp.pid;}
 	inline DWORD Addr() const {return tp.hook;}
 	inline DWORD& Status() {return status;}
@@ -83,7 +85,7 @@ public:
 	inline UINT_PTR& Timer() {return timer;}
 	inline ThreadParameter* GetThreadParameter() {return &tp;}
 	inline TextThread*& Link() {return link;}
-	inline void SetNewLineFlag();
+	
 	inline void SetRepeatFlag();
 	inline void ClearNewLineFlag();
 	inline void ClearRepeatFlag();

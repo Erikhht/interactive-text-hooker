@@ -84,19 +84,6 @@ DWORD GetCodeRange(DWORD hModule,DWORD *low, DWORD *high)
 	}
 	return 0;
 }
-void CalculateModuleHash(DWORD &low, DWORD &high)
-{
-	/*MD5_CTX ctx={0};
-	WCHAR str[0x80];
-	swprintf(str,L"%.8X:%.8X",low,high);
-	OutputConsole(str);
-	MD5Init(&ctx);
-	MD5Update(&ctx,(BYTE*)low,high-low);
-	MD5Final(&ctx);
-	for (int i=0;i<16;i++)
-		swprintf(str+2*i,L"%.2X",ctx.digest[i]);
-	OutputConsole(str);*/
-}
 inline DWORD SigMask(DWORD sig)
 {
 	__asm
@@ -115,10 +102,12 @@ _mask:
 		shr eax,cl
 	}
 }
-DWORD FindCallAndEntryBoth(DWORD fun, DWORD size, DWORD pt, WORD sig)
+DWORD FindCallAndEntryBoth(DWORD fun, DWORD size, DWORD pt, DWORD sig)
 {
 	WCHAR str[0x40];
-	DWORD i,j,t,l;
+	DWORD i,j,t,l,mask;
+	DWORD reverse_length=0x800;
+	mask=SigMask(sig);
 	bool flag1,flag2;
 	for (i=0x1000;i<size-4;i++)
 	{
@@ -150,8 +139,8 @@ DWORD FindCallAndEntryBoth(DWORD fun, DWORD size, DWORD pt, WORD sig)
 			{
 				swprintf(str,L"CALL addr: 0x%.8X",pt+i);
 				OutputConsole(str);
-				for (j=i;j>i-0x800;j--)
-					if ((*(WORD*)(pt+j))==sig) //Fun entry 1.
+				for (j=i;j>i-reverse_length;j--)
+					if ((*(WORD*)(pt+j))==(sig&mask)) //Fun entry 1.
 					{
 						swprintf(str,L"Entry: 0x%.8X",pt+j);
 						OutputConsole(str);
@@ -159,37 +148,6 @@ DWORD FindCallAndEntryBoth(DWORD fun, DWORD size, DWORD pt, WORD sig)
 					}
 				}
 			else i+=l;
-		}
-	}
-	OutputConsole(L"Find call and entry failed.");
-	return 0;
-}
-DWORD FindCallAndEntryAbs(DWORD fun, DWORD size, DWORD pt, DWORD sig)
-{
-	WCHAR str[0x40];
-	DWORD i,j,t,mask;
-	mask=SigMask(sig);
-	for (i=0x1000;i<size-4;i++)
-	{
-		if (*(WORD*)(pt+i)==0x15FF)
-		{
-			t=*(DWORD*)(pt+i+2);
-			if (t>=pt&&t<=pt+size-4)
-			{
-				if (*(DWORD*)t==fun)
-				{
-				swprintf(str,L"CALL addr: 0x%.8X",pt+i);
-				OutputConsole(str);
-				for (j=i;j>i-0x800;j--)
-					if ((*(DWORD*)(pt+j)&mask)==sig) //Fun entry 1.
-					{
-						swprintf(str,L"Entry: 0x%.8X",pt+j);
-						OutputConsole(str);
-						return pt+j;
-					}
-				}
-			}
-			else i+=6;
 		}
 	}
 	OutputConsole(L"Find call and entry failed.");
@@ -224,27 +182,10 @@ DWORD FindCallOrJmpAbs(DWORD fun, DWORD size, DWORD pt, bool jmp)
 		{
 			t=*(DWORD*)(pt+i+2);
 			if (t>pt&&t<pt+size)
-			if(*(DWORD*)t==fun) return pt+i;
-			else i+=5;
+				if(*(DWORD*)t==fun) return pt+i;
+				else i+=5;
 		}
 	}
-	return 0;
-}
-DWORD FindEntryToCallRel(DWORD fun, DWORD size, DWORD pt, DWORD sig, DWORD reverse_length=0x800)
-{
-	WCHAR str[0x40];
-	DWORD i,j,mask;
-	mask=SigMask(sig);
-	i=FindCallOrJmpRel(fun,size,pt,false);
-	if (i)
-	for (j=i;j>i-reverse_length;j--)
-		if (((*(DWORD*)j)&mask)==sig) //Fun entry 1.
-		{
-			swprintf(str,L"Entry: 0x%.8X",j);
-			OutputConsole(str);
-			return j;
-		}
-	OutputConsole(L"Find call and entry failed.");
 	return 0;
 }
 DWORD FindCallBoth(DWORD fun, DWORD size, DWORD pt)
@@ -269,6 +210,57 @@ DWORD FindCallBoth(DWORD fun, DWORD size, DWORD pt)
 	}
 	return 0;
 }
+DWORD FindCallAndEntryAbs(DWORD fun, DWORD size, DWORD pt, DWORD sig)
+{
+	WCHAR str[0x40];
+	DWORD i,j,t,mask;
+	DWORD reverse_length=0x800;
+	mask=SigMask(sig);
+	for (i=0x1000;i<size-4;i++)
+	{
+		if (*(WORD*)(pt+i)==0x15FF)
+		{
+			t=*(DWORD*)(pt+i+2);
+			if (t>=pt&&t<=pt+size-4)
+			{
+				if (*(DWORD*)t==fun)
+				{
+				swprintf(str,L"CALL addr: 0x%.8X",pt+i);
+				OutputConsole(str);
+				for (j=i;j>i-reverse_length;j--)
+					if ((*(DWORD*)(pt+j)&mask)==sig) //Fun entry 1.
+					{
+						swprintf(str,L"Entry: 0x%.8X",pt+j);
+						OutputConsole(str);
+						return pt+j;
+					}
+				}
+			}
+			else i+=6;
+		}
+	}
+	OutputConsole(L"Find call and entry failed.");
+	return 0;
+}
+DWORD FindCallAndEntryRel(DWORD fun, DWORD size, DWORD pt, DWORD sig)
+{
+	WCHAR str[0x40];
+	DWORD i,j,mask;
+	DWORD reverse_length=0x800;
+	mask=SigMask(sig);
+	i=FindCallOrJmpRel(fun,size,pt,false);
+	if (i)
+		for (j=i;j>i-reverse_length;j--)
+			if (((*(DWORD*)j)&mask)==sig) //Fun entry 1.
+			{
+				swprintf(str,L"Entry: 0x%.8X",j);
+				OutputConsole(str);
+				return j;
+			}
+			OutputConsole(L"Find call and entry failed.");
+			return 0;
+}
+
 void SpecialHookKiriKiri(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
 {
 	DWORD p1,p2;
@@ -421,7 +413,6 @@ void FindBGIHook(DWORD fun, DWORD size, DWORD pt, WORD sig)
 							}
 					}
 		}
-
 }
 void InsertBGIHook()
 {
@@ -464,7 +455,7 @@ bool InsertRealliveDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 }
 void InsertRealliveHook()
 {
-	OutputConsole(L"Probably Reallive.");
+	OutputConsole(L"Probably Reallive. Wait for text.");
 	SwitchTrigger();
 	trigger_fun=InsertRealliveDynamicHook;
 }
@@ -1010,14 +1001,14 @@ void InsertLuneHook()
 	HookParam hp={0};
 	DWORD c=FindCallOrJmpAbs((DWORD)ExtTextOutA,module_limit-module_base,(DWORD)module_base,true);
 	if (c==0) return;
-	hp.addr=FindEntryToCallRel(c,module_limit-module_base,(DWORD)module_base,0xEC8B55);
+	hp.addr=FindCallAndEntryRel(c,module_limit-module_base,(DWORD)module_base,0xEC8B55);
 	if (hp.addr==0) return;
 	hp.off=4;
 	hp.type=USING_STRING;
 	NewHook(hp,L"MBL-Furigana");
 	c=FindCallOrJmpAbs((DWORD)GetGlyphOutlineA,module_limit-module_base,(DWORD)module_base,true);
 	if (c==0) return;
-	hp.addr=FindEntryToCallRel(c,module_limit-module_base,(DWORD)module_base,0xEC8B55);
+	hp.addr=FindCallAndEntryRel(c,module_limit-module_base,(DWORD)module_base,0xEC8B55);
 	if (hp.addr==0) return;
 	hp.split=-0x18;
 	hp.length_offset=1;
@@ -1030,7 +1021,7 @@ void InsertWhirlpoolHook()
 	DWORD i,t;
 	DWORD entry=FindCallAndEntryBoth((DWORD)TextOutA,module_limit-module_base,module_base,0xEC83);
 	if (entry==0) return;
-	entry=FindEntryToCallRel(entry-4,module_limit-module_base,module_base,0xEC83);
+	entry=FindCallAndEntryRel(entry-4,module_limit-module_base,module_base,0xEC83);
 	if (entry==0) return;
 	entry=FindCallOrJmpRel(entry-4,module_limit-module_base-0x10000,module_base+0x10000,false);
 	for (i=entry-4;i>entry-0x100;i--)
@@ -1198,9 +1189,32 @@ bool InsertLiveDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 }
 void InsertLiveHook()
 {
-	OutputConsole(L"Probably Live.");
+	OutputConsole(L"Probably Live. Wait for text.");
 	SwitchTrigger();
 	trigger_fun=InsertLiveDynamicHook;
+}
+void InsertBrunsHook()
+{
+	HookParam hp={};
+	hp.off=4;
+	hp.length_offset=1;
+	hp.type=USING_UNICODE|MODULE_OFFSET|FUNCTION_OFFSET;
+	hp.function=0x8B24C7BC;
+	//?push_back@?$basic_string@GU?$char_traits@G@std@@V?$allocator@G@2@@std@@QAEXG@Z
+	if (IthCheckFile(L"msvcp90.dll"))
+	{
+		hp.module=0xC9C36A5B; //msvcp90.dll
+		NewHook(hp,L"Bruns");
+		RegisterEngineType(ENGINE_BRUNS);
+		return;
+	}
+	if (IthCheckFile(L"msvcp80.dll"))
+	{
+		hp.module=0xA9C36A5B; //msvcp80.dll
+		NewHook(hp,L"Bruns");
+		RegisterEngineType(ENGINE_BRUNS);
+		return;
+	}
 }
 void SpecialHookFrontwing(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
 {
@@ -1320,7 +1334,7 @@ bool InsertSofthouseDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 }
 void InsertSoftHouseHook()
 {
-	OutputConsole(L"Probably SoftHouseChara.");
+	OutputConsole(L"Probably SoftHouseChara. Wait for text.s");
 	SwitchTrigger();
 	trigger_fun=InsertSofthouseDynamicHook;
 }
@@ -1352,7 +1366,7 @@ bool InsertIGSDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 }
 void InsertIronGameSystemHook()
 {
-	OutputConsole(L"Probably IronGameSystem.");
+	OutputConsole(L"Probably IronGameSystem. Wait for text.");
 	SwitchTrigger();
 	trigger_fun=InsertIGSDynamicHook;
 }
@@ -1403,9 +1417,9 @@ void InsertDotNetHook1(DWORD module, DWORD module_limit)
 		}
 	}
 }
-extern "C" void __declspec(dllexport) InsertDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
+extern "C" int __declspec(dllexport) InsertDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 {
-	SwitchTrigger(!trigger_fun(addr,frame,stack));
+	return !trigger_fun(addr,frame,stack);
 }
 DWORD GetModuleBase()
 {
@@ -1474,7 +1488,6 @@ extern "C" DWORD __declspec(dllexport) DetermineEngineType()
 		InsertCircusHook();
 		return 0;
 	}
-	//if (IthCheckFile(L"rio.ini"))
 	if (IthFindFile(L"*.war"))
 	{
 		InsertShinaHook();
@@ -1537,6 +1550,11 @@ extern "C" DWORD __declspec(dllexport) DetermineEngineType()
 	if (IthCheckFile(L"live.dll"))
 	{
 		InsertLiveHook();
+		return 0;
+	}
+	if (IthCheckFile(L"libscr.dll"))
+	{
+		InsertBrunsHook();
 		return 0;
 	}
 	wcscpy(str,process_name);
@@ -1643,26 +1661,6 @@ extern "C" DWORD __declspec(dllexport) IdentifyEngine()
 {
 	FillRange(process_name,&module_base,&module_limit);
 	BYTE status=0;
-	/*__asm
-	{
-		mov eax,seh_recover
-		mov recv_eip,eax
-		push ExceptHandler
-		push fs:[0]
-		mov fs:[0],esp
-		pushad
-		mov recv_esp,esp
-	}
-	CalculateModuleHash(module_base,module_limit);status++;
-	__asm
-	{
-seh_recover:
-		popad
-		mov eax,[esp]
-		mov fs:[0],eax
-		add esp,8
-	}
-	if (status==0) OutputConsole(L"Fail to calculate hash.");*/
 	status=0;
 	__asm
 	{

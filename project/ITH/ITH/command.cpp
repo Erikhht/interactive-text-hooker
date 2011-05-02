@@ -501,6 +501,7 @@ BOOL ActiveDetachProcess(DWORD pid)
 	dwWrite=0x1000;
 	return info.ExitStatus;
 }
+void AddLink(WORD from, WORD to);
 DWORD CommandQueue::ProcessCommand(LPWSTR cmd)
 {
 	int t;
@@ -539,8 +540,8 @@ DWORD CommandQueue::ProcessCommand(LPWSTR cmd)
 			ConsoleOutput(L"Syntax error.");
 		}
 		break;
-	}
-	/*case L'm':
+	/*}
+	case L'm':
 		if (current_pid==0)
 			ConsoleOutput(L"No process hooked.");
 		else
@@ -609,7 +610,7 @@ DWORD CommandQueue::ProcessCommand(LPWSTR cmd)
 			else
 				ConsoleOutput(L"Process is not injected.");
 		}
-		break;
+		break;*/
 	case L'p':
 		{
 			int t=0;
@@ -629,6 +630,7 @@ DWORD CommandQueue::ProcessCommand(LPWSTR cmd)
 			AddLink(from&0xFFFF,to&0xFFFF);
 		}
 		break;
+	/*
 	case L'?':
 		ConsoleOutput(L"Command list:");
 		ConsoleOutput(L"h: Display this help.");
@@ -641,7 +643,7 @@ DWORD CommandQueue::ProcessCommand(LPWSTR cmd)
 		ConsoleOutput(L"t{t/s/r}[addr]:Operate on thread with start address equal addr.");
 		ConsoleOutput(L"t-Terminate s-Suspend r-Resume.");
 		ConsoleOutput(L"m: Get a list of module loaded by the current select process.");
-		break;
-	}*/
+		break;*/
+	}
 	return 0;
 }

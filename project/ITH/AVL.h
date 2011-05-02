@@ -1,20 +1,3 @@
-/*  Copyright (C) 2010-2011  kaosu (qiupf2000@gmail.com)
- *  This file is part of the Interactive Text Hooker.
-
- *  Interactive Text Hooker is free software: you can redistribute it and/or
- *  modify it under the terms of the GNU General Public License as published
- *  by the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
-
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
-
- *  You should have received a copy of the GNU General Public License
- *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #pragma once
 #define STACK_SIZE 32
 #ifndef ITH_STACK
@@ -92,8 +75,8 @@ public:
 		return Node;
 	}
 	TreeNode *Left,*Right,*Parent;
-	unsigned int rank;
-	char factor;
+	unsigned short rank;
+	char factor,reserve;
 	T key;
 	D data;
 };
@@ -294,7 +277,7 @@ public:
 	TreeNode<T*,D>* Search(T* key)
 	{
 		TreeNode<T*,D>* Find=head.Left;
-		int k;
+		char k;
 		while (Find!=0&&Find->key!=key)
 		{
 			k=fCmp(key, Find->key);
@@ -492,11 +475,17 @@ protected:
 		else {DownNode->rank+=ModifyNode->rank;BalanceNode->rank-=DownNode->rank;}
 		return DownNode;
 	}
-	inline TreeNode<T*,D>*&  _FactorLink(TreeNode<T*,D>* Node, char factor)
+	__forceinline TreeNode<T*,D>*& _FactorLink(TreeNode<T*,D>* Node, char factor)
 		//Private helper method to retrieve child according to factor.
 		//Return right child if factor>0 and left child otherwise.
 	{
-		return factor>0? Node->Right : Node->Left;
+		__asm
+		{
+			mov ecx, Node
+			movsx eax, factor
+			lea eax,[eax*2+ecx+2]
+		}
+		//return factor>0? Node->Right : Node->Left;
 	}
 	void _IncreaseHeight()
 	{
@@ -517,11 +506,23 @@ protected:
 class SCMP
 {
 public:
-	int operator()(char* s1,char* s2)
+	__forceinline char operator()(char* s1,char* s2)
 	{
-		int t=_stricmp(s1,s2);
-		if (t==0) return 0;
-		return t>0? 1:-1;
+		__asm
+		{
+			push s1
+			push s2
+			call dword ptr [_stricmp]
+			add esp,8
+			mov ecx,eax
+			sar eax,31
+			neg ecx
+			shr ecx,31
+			or eax,ecx
+		}
+		/*int t=_stricmp(s1,s2);
+		if (t==0) return 0;		
+		return t>0? 1:-1;*/
 	}
 };
 class SCPY
@@ -544,11 +545,23 @@ public:
 class WCMP
 {
 public:
-	int operator()(wchar_t* s1,wchar_t* s2)
+	__forceinline char operator()(wchar_t* s1,wchar_t* s2)
 	{
-		int t=_wcsicmp(s1,s2);
+		__asm
+		{
+			push s1
+			push s2
+			call dword ptr [_wcsicmp]
+			add esp,8
+			mov ecx,eax
+			sar eax,31
+			neg ecx
+			shr ecx,31
+			or eax,ecx
+		}
+		/*int t=_wcsicmp(s1,s2);
 		if (t==0) return 0;
-		return t>0? 1:-1;
+		return t>0? 1:-1;*/
 	}
 };
 class WCPY
@@ -556,6 +569,7 @@ class WCPY
 public:
 	wchar_t* operator()(wchar_t* dest, wchar_t* src)
 	{
+
 		return wcscpy(dest,src);
 	}
 };

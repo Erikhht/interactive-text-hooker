@@ -83,7 +83,7 @@ BOOL LoadEngine()
 	base=GetModuleBase(L"ITH_engine.dll");
 	IdentifyEngine=(IdentifyEngineFun)GetExportAddress(base,GetHash("IdentifyEngine"));
 	InsertDynamicHook=(InsertDynamicHookFun)GetExportAddress(base,GetHash("InsertDynamicHook"));
-	if (IdentifyEngine==0||InsertDynamicHook==0) return FALSE;
+	if (IdentifyEngine==0) return FALSE;
 }
 DWORD WINAPI WaitForPipe(LPVOID lpThreadParameter) //Dynamic detect ITH main module status. 
 {
@@ -133,7 +133,7 @@ DWORD WINAPI WaitForPipe(LPVOID lpThreadParameter) //Dynamic detect ITH main mod
 		live=true;
 		for (man=hookman,i=0;i<current_hook;man++)
 			if (man->RecoverHook()) i++;
-		OutputConsole(dll_mutex+9);
+		OutputConsole(dll_name);
 		OutputConsole(L"Pipe connected.");
 		OutputDWORD(tree->Count());
 		NtReleaseMutant(hMutex,0);

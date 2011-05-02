@@ -1921,6 +1921,7 @@ void ThreadWindow::SetLastSentence(DWORD number)
 	if (it)
 	{
 		it->CopyLastSentence(str);
+		str[0xFF]=0;
 		SetWindowText(heSentence,str);
 	}
 }

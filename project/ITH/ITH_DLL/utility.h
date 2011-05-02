@@ -25,7 +25,8 @@
 #define HEADER_SIZE 0xC
 extern int current_hook;
 extern WCHAR dll_mutex[];
-extern bool trigger;
+extern WCHAR dll_name[];
+extern int trigger;
 //extern DWORD current_process_id;
 template <class T,class D, class fComp, class fCopy, class fLength> class AVLTree;
 struct FunctionInfo
@@ -73,7 +74,7 @@ DWORD WINAPI WaitForPipe(LPVOID lpThreadParameter);
 DWORD WINAPI CommandPipe(LPVOID lpThreadParameter);
 void RequestRefreshProfile();
 typedef DWORD (*IdentifyEngineFun)();
-typedef void (*InsertDynamicHookFun)(LPVOID addr, DWORD frame, DWORD stack);
+typedef int (*InsertDynamicHookFun)(LPVOID addr, DWORD frame, DWORD stack);
 extern IdentifyEngineFun IdentifyEngine; 
 extern InsertDynamicHookFun InsertDynamicHook;
 
