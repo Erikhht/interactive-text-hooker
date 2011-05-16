@@ -15,19 +15,44 @@ Your processor must support SSE2. Or you may get an error message.
 
 
 ITH contains 3 files, namely ITH.exe, ITH.dll and ITH_engine.dll. These 3 files need to be put into same folder. ITH requires administrative privilege to function properly. If you are using Vista/7, you need to run ITH as administrator. 
- 
+
+== UI layout ==
+
+The first line contains 8 buttons.<br>
+*Process*: opens the _Process Explorer_.<br>
+*Thread*: opens the _Thread Editor_.<br>
+*Hook*: opens the _Hook Editor_.<br>
+*Profile*: opens the _Profile Manager_.<br>
+*Option*: opens the _Option Dialog_.<br>
+*Top*: let ITH stay on top of other windows.<br>
+*Clear*: clears text of current thread.<br>
+*Save*: save current profile.<br>
+
+The second line contains a short drop-down list and a editable area.<br>
+The short drop-down list is called _Process List_. This list contains Process ID and name of all attached process.<br>
+The editable area is called _Command Line_. You can type command here to let ITH perform actions.
+
+The third line is a long drop-down list called _Thread List_. This list contains all available thread. You can select one thread to change content of the _Text Area_.
+
+Under the _Thread List_ is the _Text Area_. This area contains text of one thread.
 == Attach ITH ==
 
-The first step of text extraction is attaching ITH to a game. Click *Process* button to open to process dialog. On the left you can see a list of processes that ITH is able to attach. This list is sorted by creation time of the process. So the latest created process is at the top of this list. Select the process you want to attach ITH, then click *Attach* button. ITH will give a message if it attach successfully. Click *OK* to close the dialog.
+The first step of text extraction is attaching ITH to a game. Open the _Process Explorer_. On the left you can see a list of processes that ITH is able to attach. This list is sorted by creation time of the process. So the latest created process is at the top of this list. Select the process you want to attach ITH, then click *Attach* button. ITH will give a message if it attach successfully. Click *OK* to close the dialog.
 
 == Select text thread ==
 
-After ITH receive some text, it will put text into _threads_. A _thread_ contains certain piece of the text. In the main window, the longer drop down list contains all the thread. If you select one, the text in the main window is changed to that thread. By default, there's only one named *ConsoleOutput*. Usually as the game display some text, more threads should be added to this list. If you can't see any thread other than ConsoleOutput while the game is flashing text, you will need to insert custom hook.
+After ITH receive some text, it will put text into _threads_. A _thread_ contains certain piece of the text. If you select one from the _Thread List_, the text in the main window is changed to that thread. By default, there's only one named *ConsoleOutput*. Usually as the game display some text, more threads should be added to this list. If you can't see any thread other than ConsoleOutput while the game is flashing text, you will need to insert custom hook.
 
 == Copy to clipboard ==
 
-ITH can copy received text to clipboard, then other translation software monitors clipboard can read the text and translate it into other language. You can simply select text by click & drag. Then the selected text is copied to clipboard. ITH is able to copy the last sentence to clipboard automatically. You need to enable this function by click *Option* and check *Auto copy to clipboard*.
+ITH can copy received text to clipboard, then other translation software monitors clipboard can read the text and translate it into other language. You can simply select text in the _Text Area_ by clicking and dragging. Then the selected text is copied to clipboard. ITH is able to copy the last sentence to clipboard automatically. You need to enable this function in the _Option Dialog_ by checking *Auto copy to clipboard*.
 
 == Save you selection ==
 
 It's bothersome to attach ITH and select text every time you start the game. After you have attached ITH and selected some thread for the first time, click *Save* to save your selection. ITH will record necessary information in ITH.pro. The next time you start this game, ITH will attach to the game and select thread automatically.
+
+== Link threads together ==
+
+When your see text appears in different threads, you don't need to switch between them every time. ITH provide a flexible mechanism to handle this case. Namely _Thread Linking_. You can find thread name in the _Thread List_. Every thread's name begins with its unique 4-digit identifier. You use this number to tell ITH which threads to link. Notice that thread number is hexadecimal. So character A-F stands for decimal number 10-15 (you won't see decimal number in _Thread List_). You will need 2 numbers to perform a link operation. Namely _From_ and _To_. There are 2 ways to link threads. 
+  * Open the *Thread Editor* by clicking *Thread*. Select thread with the number _From_ from the list in the top. Select thread with the number _To_ from the shorter list. Then click *Set*.
+  * Type "L[From]-[To]" in the _Command Line_ and press enter. No brackets, only number. Example LA-4. 
