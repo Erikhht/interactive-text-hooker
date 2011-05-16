@@ -55,4 +55,4 @@ It's bothersome to attach ITH and select text every time you start the game. Aft
 
 When your see text appears in different threads, you don't need to switch between them every time. ITH provide a flexible mechanism to handle this case. Namely _Thread Linking_. You can find thread name in the _Thread List_. Every thread's name begins with its unique 4-digit identifier. You use this number to tell ITH which threads to link. Notice that thread number is hexadecimal. So character A-F stands for decimal number 10-15 (you won't see decimal number in _Thread List_). You will need 2 numbers to perform a link operation. Namely _From_ and _To_. There are 2 ways to link threads. 
   * Open the *Thread Editor* by clicking *Thread*. Select thread with the number _From_ from the list in the top. Select thread with the number _To_ from the shorter list. Then click *Set*.
-  * Type "L[From]-[To]" in the _Command Line_ and press enter. No brackets, only number. Example LA-4. 
+  * Type L"From"-"To" in the _Command Line_ and press enter. No quotes, only number. Example LA-4. 
