@@ -39,7 +39,7 @@ data_offset: Specify where to find data. If data_offset is positive, data is tak
 || *EAX* || *ECX* || *EDX* || *EBX* || *ESP* || *EBP* || *ESI* || *EDI* ||
 || -4 || -8 || -C || -10 || -14 || -18 || -1C || -20 ||
 
-data_indirect: If value of data_offset is a pointer, use this to take one level of indirection reference. So data is taken from {{{[data_offset+data_indirect]}}}.<br>
+data_indirect: If value of data_offset is a pointer, use this to take one level of indirection reference. Assume 32-bit pointer taken according to data_offset is off_data. So data is taken from {{{[off_data+data_indirect]}}}.<br>
 split_param, split_indirect: Same to data_offset, but value is for split parameter.<br>
 addr: Absolute address or offset.<br>
 module: Target module name. Case insensitive.<br>
