@@ -42,6 +42,7 @@ DWORD Inject(HANDLE hProc)
 		MEM_COMMIT,PAGE_READWRITE);
 	if (lpvAllocAddr==0) return -1;
 	wcscpy(current_dir,DllName);
+	CheckThreadStart();
 	NtWriteVirtualMemory(hProc,lpvAllocAddr,file_path+4,2*(MAX_PATH),&dwWrite);
 	hTH=IthCreateThread(LoadLibrary,(DWORD)lpvAllocAddr,hProc);
 	if (hTH==0||hTH==INVALID_HANDLE_VALUE)
@@ -83,7 +84,7 @@ DWORD PIDByName(LPWSTR pwcTarget)
 		if (dwStatus!=STATUS_INFO_LENGTH_MISMATCH) return 0;
 		dwSize<<=1;
 	}
-	
+
 	for (spiProcessInfo=(SYSTEM_PROCESS_INFORMATION*)pbBuffer; spiProcessInfo->dNext;)
 	{
 		spiProcessInfo=(SYSTEM_PROCESS_INFORMATION*)

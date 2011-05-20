@@ -24,17 +24,13 @@ DWORD flag, enter_count;
 //provide const time hook entry.
 static int userhook_count;
 static const BYTE common_hook[]={
+	0x89, 0x3C, 0xE4, //mov [esp],edi
 	0x60, //pushad
 	0x9C, //pushfd
 	0x8D,0x54,0x24,0x28, //lea edx,[esp+0x28] --- esp value
 	0x8B,0x32, //mov esi,[edx] --- return address
-	0x68, 0,0,0,0, //push $ --- pointer to TextHook
-	0x56, //push esi
-	0x52, //push edx
+	0xB9, 0,0,0,0, //mov ecx, $ --- pointer to TextHook
 	0xE8, 0,0,0,0, //call @hook
-	0x83,0xC4,0xC, //add esp,0xC
-	0x8B,0x7C,0xE4,0x04, //mov edi,[esp+0x4]
-	0x89,0x7C,0xE4,0x24, //mov [esp+0x24],edi
 	0x9D, //popfd
 	0x61, //popad
 	0x5F, //pop edi ---skip return address on stack
@@ -116,6 +112,30 @@ static EXCEPTION_DISPOSITION ExceptHandler(EXCEPTION_RECORD *ExceptionRecord,
 	ContextRecord->Esp=recv_esp;
 	ContextRecord->Eip=recv_addr;
 	return ExceptionContinueExecution;
+}
+__declspec(naked) int ProcessHook(DWORD dwDataBase, DWORD dwRetn,TextHook *hook)
+	//Use SEH to ensure normal execution even bad hook inserted.
+{
+	__asm
+	{
+		push 0
+			mov eax,seh_recover
+			mov recv_addr,eax
+			push ExceptHandler
+			push fs:[0]
+		mov recv_esp,esp
+			mov fs:[0],esp
+			push esi
+			push edx
+			call TextHook::Send
+			inc dword ptr [esp+0x8]
+seh_recover:
+		mov eax,[esp]
+		mov fs:[0],eax
+			add esp,8
+			pop eax
+			retn
+	}
 }
 
 bool HookFilter(DWORD retn)
@@ -209,31 +229,6 @@ void TextHook::Send(DWORD dwDataBase, DWORD dwRetn)
 		}
 	}
 		if (pbData!=pbSmallBuff) delete pbData;
-	}
-}
-__declspec(naked) int ProcessHook(DWORD dwDataBase, DWORD dwRetn,TextHook *hook)
-	//Use SEH to ensure normal execution even bad hook inserted.
-{
-	__asm
-	{
-		push 0
-		mov eax,seh_recover
-		mov recv_addr,eax
-		push ExceptHandler
-		push fs:[0]
-		mov recv_esp,esp
-		mov fs:[0],esp
-		mov ecx,[esp+0x18]
-		push [esp+0x14]
-		push [esp+0x14]
-		call TextHook::Send
-		inc dword ptr [esp+0x8]
-seh_recover:
-		mov eax,[esp]
-		mov fs:[0],eax
-		add esp,8
-		pop eax
-		retn
 	}
 }
 int MapInstruction(DWORD original_addr, DWORD new_addr, BYTE& hook_len, BYTE& original_len)
@@ -391,8 +386,8 @@ int TextHook::InsertHookCode()
 	{
 		mov edx,r
 		mov eax,this
-		mov [edx+0x9],eax //push TextHook*, resolve to correspond hook.
-		lea eax,[edx+0x14]
+		mov [edx+0xC],eax //push TextHook*, resolve to correspond hook.
+		lea eax,[edx+0x15]
 		mov edx,ProcessHook
 		sub edx,eax
 		mov [eax-4],edx //call ProcessHook
@@ -532,6 +527,7 @@ int TextHook::RecoverHook()
 int TextHook::SetHookName(LPWSTR name)
 {
 	name_length=wcslen(name)+1;
+	if (hook_name) delete hook_name;
 	hook_name=new WCHAR[name_length];
 	wcscpy(hook_name,name);
 	return 0;

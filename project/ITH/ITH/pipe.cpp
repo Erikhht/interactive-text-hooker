@@ -37,7 +37,15 @@ BYTE* Filter(BYTE *str, int len)
 		s=*(WORD*)str;
 		if (len>=2)
 		{
-			if (s==0xA481||s==0x4081||s==0x3000||s<=0x20) {str+=2;len-=2;}
+			if (str[0]==0x81){
+				if (str[1]==0x40||((str[1]-2)>>4)==0xA) {str+=2;len-=2;}
+				else break;
+			}
+			else if (str[1]==0x25){
+				if ((str[0]>>4)==0xB) {str+=2;len-=2;}
+				else break;
+			}
+			else if (s==0x3000||s<=0x20) {str+=2;len-=2;}
 			else break;
 		}
 		else if ((s&0xFF)<=0x20) {str++;len--;}
@@ -68,10 +76,10 @@ void CreateNewPipe()
 
 void DetachFromProcess(DWORD pid)
 {
-	DWORD module,flag=0;
+	DWORD flag=0;
 	HANDLE hMutex,hEvent;		
 	IO_STATUS_BLOCK ios;
-	module=man->GetModuleByPID(pid);			
+	//module=man->GetModuleByPID(pid);			
 	hEvent=IthCreateEvent(0);
 	if (STATUS_PENDING==NtFsControlFile(man->GetCmdHandleByPID(pid),hEvent,0,0,&ios,
 		CTL_CODE(FILE_DEVICE_NAMED_PIPE,NAMED_PIPE_DISCONNECT,0,0),0,0,0,0))
@@ -196,7 +204,12 @@ void CommandQueue::AddRequest(const SendParam& sp, DWORD pid)
 	EnterCriticalSection(&rw);
 	queue[current]=sp;
 	if (pid) pid_associate[current++]=pid;
-	else pid_associate[current++]=man->GetCurrentPID();
+	else 
+	{
+		pid=man->GetCurrentPID();
+		if (pid) pid_associate[current++]=pid;
+		else ConsoleOutput(L"No process attached.");
+	}
 	current&=(QUEUE_MAX-1);
 	LeaveCriticalSection(&rw);
 	NtReleaseSemaphore(hSemaphore,1,0);

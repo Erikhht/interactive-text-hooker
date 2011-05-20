@@ -42,7 +42,7 @@ public:
 	void SendCommand();
 	bool Empty();
 	void Register(DWORD pid, DWORD hookman, DWORD module, DWORD engine);
-	DWORD ProcessCommand(LPWSTR cmd);
+	DWORD ProcessCommand(LPWSTR cmd, DWORD pid);
 private:
 	CRITICAL_SECTION rw;
 	DWORD current;

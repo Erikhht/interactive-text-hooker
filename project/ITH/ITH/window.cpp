@@ -39,7 +39,7 @@ LinkParam edit_lp;
 CommentParam edit_cp;
 #define COMMENT_BUFFER_LENGTH 0x200
 static WCHAR comment_buffer[COMMENT_BUFFER_LENGTH];
-DWORD clipboard_flag,cyclic_remove;
+DWORD clipboard_flag,cyclic_remove,repeat_count;
 bool Parse(LPWSTR cmd, HookParam& hp);
 void SaveSettings();
 extern LPVOID DefaultHookAddr[];
@@ -279,6 +279,8 @@ BOOL CALLBACK OptionDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			SetWindowText(GetDlgItem(hDlg,IDC_EDIT3),str);
 			swprintf(str,L"%d",insert_delay);
 			SetWindowText(GetDlgItem(hDlg,IDC_EDIT4),str);
+			swprintf(str,L"%d",repeat_count);
+			SetWindowText(GetDlgItem(hDlg,IDC_EDIT5),str);
 			CheckDlgButton(hDlg,IDC_CHECK1,auto_inject);
 			CheckDlgButton(hDlg,IDC_CHECK2,auto_insert);
 			CheckDlgButton(hDlg,IDC_CHECK3,clipboard_flag);
@@ -309,6 +311,8 @@ BOOL CALLBACK OptionDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					GetWindowText(GetDlgItem(hDlg,IDC_EDIT4),str,0x80);
 					swscanf(str,L"%d",&sd);
 					insert_delay=sd>200?sd:200;
+					GetWindowText(GetDlgItem(hDlg,IDC_EDIT5),str,0x80);
+					swscanf(str,L"%d",&repeat_count);
 					auto_inject=IsDlgButtonChecked(hDlg,IDC_CHECK1);
 					auto_insert=IsDlgButtonChecked(hDlg,IDC_CHECK2);
 					clipboard_flag=IsDlgButtonChecked(hDlg,IDC_CHECK3)>0;
@@ -983,10 +987,13 @@ LRESULT CALLBACK EditCmdProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 	case WM_CHAR:
 		if (wParam==VK_RETURN)
 		{
-			DWORD s=0;
+			DWORD s=0,pid=0;
+			WCHAR str[0x20];
 			if (SendMessage(hWnd,WM_GETTEXTLENGTH,0,0)==0) break;
 			SendMessage(hWnd,WM_GETTEXT,CMD_SIZE,(LPARAM)last_cmd);
-			cmdq->ProcessCommand(last_cmd);
+			if (GetWindowText(hwndProc,str,0x20))
+				swscanf(str,L"%d",&pid);
+			cmdq->ProcessCommand(last_cmd,pid);
 			SendMessage(hWnd,EM_SETSEL,0,-1);
 			SendMessage(hWnd,EM_REPLACESEL,FALSE,(LPARAM)&s);
 			SetFocus(hWnd);
@@ -1110,11 +1117,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						{
 							SendMessage(h,BM_SETCHECK ,BST_UNCHECKED,0);
 							SetWindowPos(hWnd,HWND_NOTOPMOST,0,0,0,0,SWP_NOSIZE|SWP_NOMOVE);
+							if (hProcDlg) SetWindowPos(hProcDlg,HWND_NOTOPMOST,0,0,0,0,SWP_NOSIZE|SWP_NOMOVE);
+							if (hThreadDlg) SetWindowPos(hThreadDlg,HWND_NOTOPMOST,0,0,0,0,SWP_NOSIZE|SWP_NOMOVE);
+							if (hHookDlg) SetWindowPos(hHookDlg,HWND_NOTOPMOST,0,0,0,0,SWP_NOSIZE|SWP_NOMOVE);
+							if (hProfileDlg) SetWindowPos(hProfileDlg,HWND_NOTOPMOST,0,0,0,0,SWP_NOSIZE|SWP_NOMOVE);
+							if (hOptionDlg) SetWindowPos(hOptionDlg,HWND_NOTOPMOST,0,0,0,0,SWP_NOSIZE|SWP_NOMOVE);
 						}
 						else
 						{
 							SendMessage(h,BM_SETCHECK ,BST_CHECKED,0);
 							SetWindowPos(hWnd,HWND_TOPMOST,0,0,0,0,SWP_NOSIZE|SWP_NOMOVE);
+							if (hProcDlg) SetWindowPos(hProcDlg,HWND_TOPMOST,0,0,0,0,SWP_NOSIZE|SWP_NOMOVE);
+							if (hThreadDlg) SetWindowPos(hThreadDlg,HWND_TOPMOST,0,0,0,0,SWP_NOSIZE|SWP_NOMOVE);
+							if (hHookDlg) SetWindowPos(hHookDlg,HWND_TOPMOST,0,0,0,0,SWP_NOSIZE|SWP_NOMOVE);
+							if (hProfileDlg) SetWindowPos(hProfileDlg,HWND_TOPMOST,0,0,0,0,SWP_NOSIZE|SWP_NOMOVE);
+							if (hOptionDlg) SetWindowPos(hOptionDlg,HWND_TOPMOST,0,0,0,0,SWP_NOSIZE|SWP_NOMOVE);
 						}
 					}
 					else if (h==hwndSave)

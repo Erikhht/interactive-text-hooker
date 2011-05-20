@@ -25,6 +25,7 @@ public:
 	BitMap();
 	~BitMap();
 	bool Check(DWORD number);
+	void Init(BYTE* m, DWORD size);
 	void Set(DWORD number);
 	void Clear(DWORD number);
 private:

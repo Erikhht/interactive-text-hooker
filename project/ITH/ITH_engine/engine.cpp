@@ -26,6 +26,7 @@ static DWORD module_base, module_limit;
 static LPVOID trigger_addr;
 static char text_buffer[0x1000];
 static char text_buffer_prev[0x1000];
+static DWORD buffer_index;
 extern BYTE LeadByteTable[0x100];
 typedef bool (*tfun)(LPVOID addr, DWORD frame, DWORD stack);
 static tfun trigger_fun;
@@ -104,7 +105,7 @@ _mask:
 }
 DWORD FindCallAndEntryBoth(DWORD fun, DWORD size, DWORD pt, DWORD sig)
 {
-	WCHAR str[0x40];
+	//WCHAR str[0x40];
 	DWORD i,j,t,l,mask;
 	DWORD reverse_length=0x800;
 	mask=SigMask(sig);
@@ -137,13 +138,13 @@ DWORD FindCallAndEntryBoth(DWORD fun, DWORD size, DWORD pt, DWORD sig)
 			else flag1=false;
 			if (flag1)
 			{
-				swprintf(str,L"CALL addr: 0x%.8X",pt+i);
-				OutputConsole(str);
+				//swprintf(str,L"CALL addr: 0x%.8X",pt+i);
+				//OutputConsole(str);
 				for (j=i;j>i-reverse_length;j--)
 					if ((*(WORD*)(pt+j))==(sig&mask)) //Fun entry 1.
 					{
-						swprintf(str,L"Entry: 0x%.8X",pt+j);
-						OutputConsole(str);
+						//swprintf(str,L"Entry: 0x%.8X",pt+j);
+						//OutputConsole(str);
 						return pt+j;
 					}
 				}
@@ -164,7 +165,7 @@ DWORD FindCallOrJmpRel(DWORD fun, DWORD size, DWORD pt, bool jmp)
 			t=*(DWORD*)(pt+i+1);
 			if(pt+i+5+t==fun) 
 			{
-				OutputDWORD(pt+i);
+				//OutputDWORD(pt+i);
 				return pt+i;
 			}
 			else i+=5;
@@ -212,7 +213,7 @@ DWORD FindCallBoth(DWORD fun, DWORD size, DWORD pt)
 }
 DWORD FindCallAndEntryAbs(DWORD fun, DWORD size, DWORD pt, DWORD sig)
 {
-	WCHAR str[0x40];
+	//WCHAR str[0x40];
 	DWORD i,j,t,mask;
 	DWORD reverse_length=0x800;
 	mask=SigMask(sig);
@@ -225,13 +226,13 @@ DWORD FindCallAndEntryAbs(DWORD fun, DWORD size, DWORD pt, DWORD sig)
 			{
 				if (*(DWORD*)t==fun)
 				{
-				swprintf(str,L"CALL addr: 0x%.8X",pt+i);
-				OutputConsole(str);
+				//swprintf(str,L"CALL addr: 0x%.8X",pt+i);
+				//OutputConsole(str);
 				for (j=i;j>i-reverse_length;j--)
 					if ((*(DWORD*)(pt+j)&mask)==sig) //Fun entry 1.
 					{
-						swprintf(str,L"Entry: 0x%.8X",pt+j);
-						OutputConsole(str);
+						//swprintf(str,L"Entry: 0x%.8X",pt+j);
+						//OutputConsole(str);
 						return pt+j;
 					}
 				}
@@ -244,7 +245,7 @@ DWORD FindCallAndEntryAbs(DWORD fun, DWORD size, DWORD pt, DWORD sig)
 }
 DWORD FindCallAndEntryRel(DWORD fun, DWORD size, DWORD pt, DWORD sig)
 {
-	WCHAR str[0x40];
+	//WCHAR str[0x40];
 	DWORD i,j,mask;
 	DWORD reverse_length=0x800;
 	mask=SigMask(sig);
@@ -253,8 +254,8 @@ DWORD FindCallAndEntryRel(DWORD fun, DWORD size, DWORD pt, DWORD sig)
 		for (j=i;j>i-reverse_length;j--)
 			if (((*(DWORD*)j)&mask)==sig) //Fun entry 1.
 			{
-				swprintf(str,L"Entry: 0x%.8X",j);
-				OutputConsole(str);
+				//swprintf(str,L"Entry: 0x%.8X",j);
+				//OutputConsole(str);
 				return j;
 			}
 			OutputConsole(L"Find call and entry failed.");
@@ -586,12 +587,7 @@ rUGP hook:
 void InsertRUGPHook()
 {
 	DWORD low,high,t;
-	if (FillRange(L"rvmm.dll",&low,&high)==0)
-	{
-		rt:
-		OutputConsole(L"Unknown rUGP engine.");
-		return;
-	}
+	if (FillRange(L"rvmm.dll",&low,&high)==0) goto rt;
 	WCHAR str[0x40];
 	LPVOID ch=(LPVOID)0x8140;
 	t=SearchPattern(low+0x20000,high-low-0x20000,&ch,4)+0x20000;
@@ -639,6 +635,8 @@ void InsertRUGPHook()
 					return;
 				}
 	}
+rt:
+	OutputConsole(L"Unknown rUGP engine.");
 }
 /********************************************************************************************
 Lucifen hook:
@@ -1142,6 +1140,55 @@ void InsertMalieHook()
 	NewHook(hp,L"Malie");
 	RegisterEngineType(ENGINE_MALIE);
 }
+static DWORD furi_flag;
+void SpecialHookMalie(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+{
+	DWORD index,ch,ptr;
+	ch=*(DWORD*)(esp_base-0x8)&0xFFFF;
+	ptr=*(DWORD*)(esp_base-0x24);
+	*data=ch;
+	*len=2;
+	if (furi_flag)
+	{
+		index=*(DWORD*)(esp_base-0x10);
+		if (*(WORD*)(ptr+index*2-2)<0xA)
+			furi_flag=0;
+	}
+	else if (ch==0xA)
+	{
+		furi_flag=1;
+		len=0;
+	}
+	*split=furi_flag;	
+}
+void InsertMalieHook2()
+{
+	BYTE ins[4]={0x66,0x3D,0x1,0};
+	DWORD p;
+	BYTE* ptr;
+	p=SearchPattern(module_base,module_limit-module_base,ins,4);
+	if (p)
+	{
+		ptr=(BYTE*)(p+module_base);
+_again:
+		if (*(WORD*)ptr==0x3D66)
+		{		
+			ptr+=4;
+			if (ptr[0]==0x75) {ptr+=ptr[1]+2;goto _again;}
+			if (*(WORD*)ptr==0x850F) {ptr+=*(DWORD*)(ptr+2)+6;goto _again;}
+		}
+		HookParam hp={};
+		hp.addr=(DWORD)ptr+4;
+		hp.off=-8;
+		hp.length_offset=1;
+		hp.extern_fun=(DWORD)SpecialHookMalie;
+		hp.type=EXTERN_HOOK|USING_SPLIT|USING_UNICODE|NO_CONTEXT;
+		NewHook(hp,L"Malie");
+		RegisterEngineType(ENGINE_MALIE);
+		return;
+	}
+	OutputConsole(L"Unknown malie system.");
+}
 void InsertAbelHook()
 {
 	DWORD character[2]={0xC981D48A,0xFFFFFF00};
@@ -1167,13 +1214,16 @@ void InsertAbelHook()
 bool InsertLiveDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 {
 	if (addr!=GetGlyphOutlineA) return false;
-	DWORD i,j;
+	DWORD i,j,k;
 	HookParam hp={0};
 	i=frame;
 	if (i!=0)
 	{
-		i=*(DWORD*)(i+4);
-		j=i+*(DWORD*)(i-4);
+		k=*(DWORD*)i;
+		k=*(DWORD*)(k+4);
+		if (*(BYTE*)(k-5)!=0xE8)
+			k=*(DWORD*)(i+4);
+		j=k+*(DWORD*)(k-4);
 		if (j>module_base&&j<module_limit)
 		{
 			hp.addr=j;
@@ -1545,6 +1595,14 @@ extern "C" DWORD __declspec(dllexport) DetermineEngineType()
 	if (IthCheckFile(L"resident.dll"))
 	{
 		InsertRetouchHook();
+		return 0;
+	}
+	if (IthCheckFile(L"malie.ini"))
+	{
+		if (IthCheckFile(L"tools.dll"))
+			InsertMalieHook();
+		else
+			InsertMalieHook2();	
 		return 0;
 	}
 	if (IthCheckFile(L"live.dll"))

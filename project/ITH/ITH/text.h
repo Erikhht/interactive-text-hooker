@@ -60,7 +60,8 @@ public:
 	virtual ~TextThread();
 	void Reset();
 	void AddToStore(BYTE* con,int len, bool new_line=false, bool console=false);
-	void RemoveSingleRepeat(BYTE* con, int &len);
+	void RemoveSingleRepeatAuto(BYTE* con, int &len);
+	void RemoveSingleRepeatForce(BYTE* con, int &len);
 	void RemoveCyclicRepeat(BYTE* &con, int &len);
 	void AddLineBreak();
 	void ResetEditText();

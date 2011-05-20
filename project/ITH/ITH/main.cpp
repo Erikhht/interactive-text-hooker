@@ -26,7 +26,8 @@ static WCHAR exist[]=L"ITH_PIPE_EXIST";
 static WCHAR mutex[]=L"ITH_RUNNING";
 static WCHAR message[]=L"Can't enable SeDebugPrevilege. ITH might malfunction.\r\n\
 Please run ITH as administrator or turn off UAC.";
-static WCHAR new_year[]=L"Happy Chinese Lunar New Year!";
+
+
 static WCHAR nygala[]=L"CCTV New Year's Gala will start after";
 extern LPCWSTR ClassName,ClassNameAdmin;
 HINSTANCE hIns;
@@ -61,9 +62,18 @@ void GetDebugPriv(void)
 	NtOpenProcessToken(NtCurrentProcess(), TOKEN_ADJUST_PRIVILEGES|TOKEN_QUERY,&hToken);	
 	if (STATUS_SUCCESS==NtAdjustPrivilegesToken(hToken,FALSE,&Privileges,sizeof(Privileges),NULL,&dwRet))
 		admin=true;
+	else MessageBox(0,message,L"Warning!",0);
 
 	NtClose(hToken);
 }
+char* setting_string[]={"split_time","process_time","inject_delay","insert_delay",
+	"auto_inject",	"auto_insert","auto_copy","auto_suppress",
+	"window_left","window_right","window_top","window_bottom"};
+DWORD window_left,window_right,window_top,window_bottom;
+DWORD* setting_variable[]={&split_time,&process_time,&inject_delay,&insert_delay,
+	&auto_inject,&auto_insert,&clipboard_flag,&cyclic_remove,
+	&window_left,&window_right,&window_top,&window_bottom};
+DWORD default_setting[]={200,50,3000,500,1,1,0,0,100,800,100,600};
 void SaveSettings()
 {
 	HANDLE hFile=IthCreateFile(L"ITH.ini",GENERIC_WRITE,FILE_SHARE_READ,FILE_OVERWRITE_IF);
@@ -105,57 +115,33 @@ void LoadSettings()
 		char* buffer=new char[info.AllocationSize.LowPart];
 		char* ptr;
 		NtReadFile(hFile,0,0,0,&ios,buffer,info.AllocationSize.LowPart,0,0);
-		ptr=strstr(buffer,"split_time");
-		if (ptr==0) ptr=buffer;
-		if (sscanf(ptr,"split_time=%d",&split_time)==0) split_time=200;
-
-		ptr=strstr(ptr,"process_time");
-		if (ptr==0) ptr=buffer;
-		if (sscanf(ptr,"process_time=%d",&process_time)==0) process_time=50;
-
-		ptr=strstr(ptr,"inject_delay");
-		if (ptr==0) ptr=buffer;
-		if (sscanf(ptr,"inject_delay=%d",&inject_delay)==0) inject_delay=3000;
-
-		ptr=strstr(ptr,"insert_delay");
-		if (ptr==0) ptr=buffer;
-		if (sscanf(ptr,"insert_delay=%d",&insert_delay)==0) insert_delay=500;
-
-		ptr=strstr(ptr,"auto_inject");
-		if (ptr==0) ptr=buffer;
-		if (sscanf(ptr,"auto_inject=%d",&auto_inject)==0) auto_inject=1;
-		auto_inject=auto_inject>0?1:0;
-
-		ptr=strstr(ptr,"auto_insert");
-		if (ptr==0) ptr=buffer;
-		if (sscanf(ptr,"auto_insert=%d",&auto_insert)==0) auto_insert=1;
-		auto_insert=auto_insert>0?1:0;
-
-		ptr=strstr(ptr,"auto_copy");
-		if (ptr==0) ptr=buffer;
-		if (sscanf(ptr,"auto_copy=%d",&clipboard_flag)==0) clipboard_flag=1;
-		clipboard_flag=clipboard_flag>0?1:0;
-
-		ptr=strstr(ptr,"auto_suppress");
-		if (ptr==0) ptr=buffer;
-		if (sscanf(ptr,"auto_suppress=%d",&cyclic_remove)==0) cyclic_remove=1;
-		cyclic_remove=cyclic_remove>0?1:0;
-
-		ptr=strstr(ptr,"window_left");
-		if (ptr==0) ptr=buffer;
-		if (sscanf(ptr,"window_left=%d",&window.left)==0) window.left=100;
-
-		ptr=strstr(ptr,"window_right");
-		if (ptr==0) ptr=buffer;
-		if (sscanf(ptr,"window_right=%d",&window.right)==0) window.right=700;
-
-		ptr=strstr(ptr,"window_top");
-		if (ptr==0) ptr=buffer;
-		if (sscanf(ptr,"window_top=%d",&window.top)==0) window.top=100;
-
-		ptr=strstr(ptr,"window_bottom");
-		if (ptr==0) ptr=buffer;
-		if (sscanf(ptr,"window_bottom=%d",&window.bottom)==0) window.bottom=600;
+		for (int i=0;i<sizeof(setting_string)/sizeof(char*);i++)
+		{
+			ptr=strstr(buffer,setting_string[i]);
+			if (ptr==0) ptr=buffer;
+			if (sscanf(strchr(ptr,'=')+1,"%d",setting_variable[i])==0) 
+				*setting_variable[i]=default_setting[i];
+		}
+		if (auto_inject>1) auto_inject=1;
+		if (auto_insert>1) auto_insert=1;
+		if (clipboard_flag>1) clipboard_flag=1;
+		if (cyclic_remove>1) cyclic_remove=1;
+		if ((window_left|window_right|window_top|window_bottom)>>31)
+		{
+			window_left=100;
+			window_top=100;
+			window_right=800;
+			window_bottom=600;
+		}
+		else
+		{
+			if (window_right<window_left || window_right-window_left<600) window_right=window_left+600;
+			if (window_bottom<window_top || window_bottom-window_top<200) window_bottom=window_top+200;
+		}
+		window.left=window_left;
+		window.right=window_right;
+		window.top=window_top;
+		window.bottom=window_bottom;
 		delete buffer;
 		NtClose(hFile);
 	}

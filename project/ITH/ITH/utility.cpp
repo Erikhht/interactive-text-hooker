@@ -19,10 +19,12 @@
 #define MAX_ENTRY 0x40
 //#include <richedit.h>
 WCHAR user_entry[0x40];
-static LPWSTR init_message=L"Interactive Text Hooker 2.2 (2011.5.2) - kaosu@hongfire\r\n";
+static LPWSTR init_message=L"Interactive Text Hooker 2.2 (2011.5.3)\r\n\
+Copyright (C) 2010-2011  kaosu (qiupf2000@gmail.com)\r\n";
 static BYTE null_buffer[4]={0,0,0,0};
 static BYTE static_small_buffer[0x100];
 extern BYTE* static_large_buffer;
+extern DWORD repeat_count;
 LPWSTR HookNameInitTable[]={
 	L"ConsoleOutput",
 	L"GetTextExtentPoint32A",
@@ -98,7 +100,10 @@ void CALLBACK NewLineBuff(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime)
 	TextThread *id=(TextThread*)idEvent;
 			
 	if (id->Status()&CURRENT_SELECT)
+	{
 		texts->SetLine();
+		id->CopyLastToClipboard();
+	}
 	id->SetNewLineFlag();
 }
 void CALLBACK NewLineConsole(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime)
@@ -161,7 +166,7 @@ void BitMap::Clear(DWORD number)
 	map[number>>3]&=~(1<<(number&7));
 }
 
-extern "C" __declspec(dllimport) int printf(const char*,...);
+//extern "C" __declspec(dllimport) int printf(const char*,...);
 TextBuffer::TextBuffer():line(false),unicode(false)
 {
 	NtClose(IthCreateThread(FlushThread,(DWORD)this));
@@ -184,6 +189,7 @@ void TextBuffer::AddNewLIne()
 static BYTE replace_buffer[0x400];
 void TextBuffer::ReplaceSentence(BYTE* text, int len)
 {
+	if (len==0) return;
 	EnterCriticalSection(&cs_store);
 	Flush();
 	DWORD t,l;
@@ -195,16 +201,9 @@ void TextBuffer::ReplaceSentence(BYTE* text, int len)
 	}
 	else
 	{
-		//WCHAR temp[0x80];
-		//LPWSTR uni;
-		//if (len>=0x80) uni=new WCHAR[len+1];
-		//else uni=temp;
 		l=MB_WC_count((char*)text,len);
-		//l=MB_WC((char*)text,uni);
-		//uni[l]=0;
 		SendMessage(hwndEdit,EM_SETSEL,t-l,t);
 		SendMessage(hwndEdit,WM_CLEAR,0,0);
-		//if (uni!=temp) delete uni;
 	}
 	LeaveCriticalSection(&cs_store);
 }
@@ -220,12 +219,13 @@ void TextBuffer::SetUnicode(bool mode)
 void TextBuffer::Flush()
 {
 	if (line||used==0) return;
-	EnterCriticalSection(&cs_store);
 	DWORD t;
-	storage[used]=0;
-	storage[used+1]=0;
 	t=SendMessage(hwndEdit,WM_GETTEXTLENGTH,0,0);
 	SendMessage(hwndEdit,EM_SETSEL,t,-1);
+	EnterCriticalSection(&cs_store);
+	storage[used]=0;
+	storage[used+1]=0;
+
 	if (unicode)
 		SendMessage(hwndEdit,EM_REPLACESEL,FALSE,(LPARAM)storage);
 	else
@@ -285,30 +285,6 @@ TextThread* ThreadTable::FindThread(DWORD number)
 
 __forceinline int TCmp::operator()(const ThreadParameter* t1, const ThreadParameter* t2)
 {
-	/*__asm
-	{
-		mov ecx,t1
-		mov edx,t2
-		mov eax,[ecx]
-		sub eax,[edx]
-		jnz _not_equal
-		mov eax,[ecx+4]
-		sub eax,[edx+4]
-		jnz _not_equal
-		mov eax,[ecx+8]
-		sub eax,[edx+8]
-		jnz _not_equal
-		mov eax,[ecx+0xC]
-		sub eax,[edx+0xC]
-		jz _final
-_not_equal:
-		mov ecx,eax
-		sar eax,31
-		neg ecx
-		shr ecx,31
-		or eax,ecx
-_final:
-	}*/
 	DWORD t;
 	t=t1->pid-t2->pid;
 	if (t==0)
@@ -355,7 +331,7 @@ HookManager::HookManager()
 }
 HookManager::~HookManager()
 {
-	while (register_count-1)
+	while (record[0].pid_register)
 		UnRegisterProcess(record[0].pid_register);
 	delete table;
 	delete head.key;
@@ -584,8 +560,9 @@ void HookManager::UnRegisterProcess(DWORD pid)
 		k=SendMessage(hwndProc,CB_DELETESTRING,i,0);
 		if (i==j) SendMessage(hwndProc,CB_SETCURSEL,k-1,0);
 	}
+	else goto _unregistered;
 	for (i=0;i<MAX_REGISTER;i++) if(record[i].pid_register==pid) break;
-	FreeThreadStart(record[i].process_handle);
+	//FreeThreadStart(record[i].process_handle);
 	NtClose(text_pipes[i]);
 	NtClose(cmd_pipes[i]);
 	NtClose(record[i].hookman_mutex);
@@ -606,7 +583,7 @@ void HookManager::UnRegisterProcess(DWORD pid)
 		//entry_table->RemoveProcessHook(pid);
 	}
 	pid_map->Clear(pid>>2);
-
+_unregistered:
 	LeaveCriticalSection(&hmcs);
 }
 void HookManager::SetName(DWORD type)
@@ -695,10 +672,10 @@ void HookManager::AddConsoleOutput(LPWSTR text)
 	{
 		int len=wcslen(text)<<1;
 		TextThread *console=table->FindThread(0);
-		EnterCriticalSection(&hmcs);
+		//EnterCriticalSection(&hmcs);
 		console->AddToStore((BYTE*)text,len,false,true);
 		console->AddToStore((BYTE*)L"\r\n",4,true,true);
-		LeaveCriticalSection(&hmcs);
+		//LeaveCriticalSection(&hmcs);
 	}
 }
 void HookManager::ClearText(DWORD pid, DWORD hook, DWORD retn, DWORD spl)
@@ -985,7 +962,7 @@ void TextThread::AdjustPrevRepeat(DWORD len)
 	repeat_index+=len;
 	if (repeat_index>=sentence_length) repeat_index-=sentence_length;*/
 }
-void TextThread::RemoveSingleRepeat(BYTE* con,int &len)
+void TextThread::RemoveSingleRepeatAuto(BYTE* con,int &len)
 {
 	WORD* text=(WORD*)con;
 	if (len<=2)
@@ -1075,6 +1052,20 @@ void TextThread::RemoveSingleRepeat(BYTE* con,int &len)
 		} //repeat_single decided?
 	} //len
 }
+void TextThread::RemoveSingleRepeatForce(BYTE* con,int &len)
+{
+	WORD* text=(WORD*)con;
+	if (repeat_single_count<repeat_count&&last==*text) 
+	{	
+		len=0;		
+		repeat_single_count++;
+	}
+	else 
+	{
+		last=*text;
+		repeat_single_count=0;
+	}
+}
 void TextThread::RemoveCyclicRepeat(BYTE* &con, int &len)
 {
 	DWORD currnet_time=GetTickCount();
@@ -1100,11 +1091,7 @@ void TextThread::RemoveCyclicRepeat(BYTE* &con, int &len)
 			int half_length=repeat_index+len;
 			if (memcmp(storage+last_sentence,storage+last_sentence+half_length,repeat_index)==0)
 			{
-				//half_length=repeat_index+len;				
 				len=0;
-				//used-=repeat_index;
-				
-				//memset(storage+last_sentence+half_length,0,half_length);
 				sentence_length=half_length;
 				status&=~REPEAT_DETECT;
 				status|=REPEAT_SUPPRESS;
@@ -1112,6 +1099,7 @@ void TextThread::RemoveCyclicRepeat(BYTE* &con, int &len)
 				if (status&CURRENT_SELECT)
 					texts->ReplaceSentence(storage+last_sentence+half_length,repeat_index);
 				ClearMemory(last_sentence+half_length,repeat_index);
+				used-=repeat_index;
 				repeat_index=0;
 			}
 			else repeat_index+=len;
@@ -1139,6 +1127,7 @@ void TextThread::RemoveCyclicRepeat(BYTE* &con, int &len)
 					DWORD u=used;
 					while (memcmp(storage+u-len,con,len)==0) u-=len;
 					ClearMemory(u,used-u);
+					used=u;
 					repeat_index=0;
 					if (status&CURRENT_SELECT)
 						texts->ReplaceSentence(storage+last_sentence,used-u);
@@ -1220,8 +1209,6 @@ _again:
 }
 void TextThread::AddLineBreak()
 {
-	if (status&CURRENT_SELECT)
-		CopyLastToClipboard();
 	if (status&BUFF_NEWLINE)
 	{
 		prev_sentence=last_sentence;
@@ -1265,7 +1252,12 @@ void TextThread::PrevRepeatLength(DWORD &len)
 void TextThread::AddToStore(BYTE* con,int len, bool new_line,bool console)
 {
 	if (con==0) return;
-	if (!new_line&&!console) RemoveSingleRepeat(con,len);
+	if (!new_line&&!console) 
+	{
+		if (repeat_count) RemoveSingleRepeatForce(con,len);
+		else RemoveSingleRepeatAuto(con,len);
+	}
+	if (len<=0) return;
 	if(cyclic_remove&&!console) RemoveCyclicRepeat(con,len);
 	if (len<=0) return;
 	if (status&BUFF_NEWLINE) AddLineBreak();
@@ -1481,8 +1473,6 @@ void TextThread::SetComment(LPWSTR str)
 void TextThread::SetNewLineFlag()
 {
 	status|=BUFF_NEWLINE;
-	/*if (status&CURRENT_SELECT)
-		CopyLastToClipboard();*/
 }
 void TextThread::SetNewLineTimer()
 {

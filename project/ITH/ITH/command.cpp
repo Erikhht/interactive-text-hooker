@@ -498,18 +498,19 @@ BOOL ActiveDetachProcess(DWORD pid)
 	NtQueryInformationThread(hThread,ThreadBasicInformation,&info,sizeof(info),0);					
 	NtClose(hThread);	
 	NtSetEvent(hPipeExist,0);
+	FreeThreadStart(hProc);
 	dwWrite=0x1000;
 	return info.ExitStatus;
 }
 void AddLink(WORD from, WORD to);
-DWORD CommandQueue::ProcessCommand(LPWSTR cmd)
+DWORD CommandQueue::ProcessCommand(LPWSTR cmd, DWORD pid)
 {
 	int t;
 	LPWSTR ts=wcsrchr(cmd,L':');
 	if (ts) *ts=0;
 	_wcslwr(cmd);
 	if (ts) *ts=L':';
-	DWORD pid=0,current_pid=GetCurrentPID();
+	//DWORD pid=0,current_pid=GetCurrentPID();
 	//WCHAR str[0x200];
 
 	switch (cmd[0])

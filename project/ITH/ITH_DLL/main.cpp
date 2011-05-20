@@ -141,6 +141,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 		GetFunctionNames();
 		InitFilterTable();
 		InitDefaultHook();
+		
 		hSendThread=IthCreateThread(WaitForPipe,0);
 		hCmdThread=IthCreateThread(CommandPipe,0);
 		}
@@ -162,6 +163,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 		NtClose(hmMutex);
 		NtClose(hMutex);
 		delete tree;
+		//FreeThreadStart(NtCurrentProcess());
 		IthCloseSystemService();
 		break;
 	}
