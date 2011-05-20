@@ -25,9 +25,8 @@ This technique let you intercept program execution, and do anything you want at 
   * Split data if necessary (when text with different meaning processed at one place).
 
 = Encoding of information =
-AGTH H-code is a efficient method to encode this information.
-Although it's not complete in theory, it can handle most cases.
-When text processing is too complicated to represent for H-code, a extern hook is needed. That is, we provide our own code to gather information for ITH.
+AGTH H-code is an efficient method to encode this information.
+Although it's not complete in theory, it can handle most of common cases. When text processing is too complicated to represent by H-code, an extern hook is needed. That is, we provide our own code to gather information for ITH.
 === H-code format ===
 {{{
 /H{A|B|W|S|Q}[N][data_offset[*data_indirect]][:split_param[*split_indirect]]@addr[:module[:name]]
@@ -70,10 +69,4 @@ Now I take some examples to demonstrate the whole process to build a hook.<br>
 1. Font caching issue<br>
 Example BGI engine. 素晴らしき日々
 Default hook gives a thread from TextOutA. Set breakpoint at TextOutA.
-Called from 41F1F2. We navigate to the entry of current function -- 41F1A0.
-Set a breakpoint there and let the process fly. 
-We can observe that process breaks at 41F1A0 as many times as TextOutA.
-So we continue step out. 41F1A0 is called from 41F45A. Entry of this function is 41F400.
-This time process breaks at 41F400 more than TextOutA, as well as 41F1A0.
-At 41F400, EAX contains data we want.
-/HA-4@41F400. 
+Called from 41F1F2. We navigate to the entry of current function -- 41F1A0. Set a breakpoint there and let the process fly. We can observe that process breaks at 41F1A0 as many times as TextOutA. So we continue step out. 41F1A0 is called from 41F45A. Entry of this function is 41F400. This time process breaks at 41F400 more than TextOutA, as well as 41F1A0. At 41F400, EAX contains data we want. So the code is /HA-4@41F400. Then we discover that it mess up with some punctuation. Keep the breakpoint at 41F400 and clears all other. We can discover that ESP changes several times during one sentence, especially when the character is punctuation(for example 8141:、). So we use ESP as split parameter. H-code is /HA-4:-14@41F400. Simple test shows that this code works pretty well.
