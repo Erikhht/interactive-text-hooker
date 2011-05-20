@@ -1,0 +1,78 @@
+#summary Custom hook develop guide
+
+= Introduction =
+This article describe the process of custom hook devloping and H-code format. Reader should be familiar with x86 architecture, assembly and debuggers.
+
+= What ITH does =
+When perform attach operation, ITH will inject a DLL into target process. The DLL then insert hooks within the target process address space. Since x86 is Von Neumann architecture. Program code resides in the same address space as program data. So if coded carefully, read/write certain part of memory can change the program's execution flow. After a hook is inserted at a certain address, whenver the program execute the instruction at that address, it will first execute hook code. ITH insert hook as follow:
+
+1. Disassemble instruction length at the target address, make sure it's greater than 5.<br>
+2. Copy the instructions to somewhere else for later recovery.<br>
+3. Allocate memory and fill it with hook code. <br>
+4. Modify instrution at the target process to CALL $(E8 $), where $ stands for the hook code entry address. The call instruction is 5 bytes long, if we copied more than 5 bytes, fill the rest with INT 3(CC).<br>
+5. Copy original instruction after hook code, do necessary modifications(any position relative instruction, jmp,call, etc)
+and insert a JMP $(E9) at the end. Here $ stands for the next instruction at the target address.
+
+This technique let you intercept program execution, and do anything you want at that point. ITH applies this technique to text processing related routes to intercept text. At a certain point ITH can<br>
+  * Read all register value<br>
+  * Access most memory except the stack above current ESP.
+
+= Information needed to build hook =
+  * Address data indicating where to insert hook.<br>
+  * Text data(whether it reside in register or at some memory location)<br>
+  * Text data processing information (Endian, Unicode, String...)<br>
+  * Split data if necessary (when text with different meaning processed at one place).
+
+= Encoding of information =
+AGTH H-code is a efficient method to encode this information.
+Although it's not complete in theory, it can handle most cases.
+When text processing is too complicated to represent for H-code, a extern hook is needed. That is, we provide our own code to gather information for ITH.
+=== H-code format ===
+{{{
+/H{A|B|W|S|Q}[N][data_offset[*data_indirect]][:split_param[*split_indirect]]@addr[:module[:name]]
+}}}
+/H: Prefix for H-code.<br>
+A|B|W|S|Q: Data form.<br>
+N: Disable(zero) first split parameter. By default, the first split parameter is taken from {{{[ESP]}}}.
+data_offset: Specify where to find data. If data_offset is positive, data is taken from {{{[ESP+data_offset]}}}. If data_offset is negative, it refers to registers as follow.
+
+|| *EAX* || *ECX* || *EDX* || *EBX* || *ESP* || *EBP* || *ESI* || *EDI* ||
+|| -4 || -8 || -C || -10 || -14 || -18 || -1C || -20 ||
+
+data_indirect: If value of data_offset is a pointer, use this to take one level of indirection reference. So data is taken from {{{[data_offset+data_indirect]}}}.<br>
+split_param, split_indirect: Same to data_offset, but value is for split parameter.<br>
+addr: Absolute address or offset.<br>
+module: Target module name. Case insensitive.<br>
+name: Export function name. Case sensitive.
+
+Some examples:<br> 
+{{{/HA-4@41F400}}} -> SHIFT-JIS character in EAX, 8? at AH.<br>
+{{{/HS4@CE1F0:koisora_main.exe}}} -> If koisora_main is mapped at 400000, insert address is 400000+CE1F0=10E1F0. First cell below stack contains a SHIFT-JIS string pointer.<br>
+{{{/HWN-10*-8:-10*10@46AE28}}} -> Unicode character at {{{[EBX-8]}}}, split parameter at {{{[EBX+10]}}}, zero default split parameter.
+
+
+= Valid address form =
+Most of current H-codes use absolute address(@address). It's resolved to the correspond address in target process virtual address space. Base-offset(@offset:base) is a more flexible form. You specify a module name as base address, and an offset to add to that base. This form is necessary if you are hooking in DLL or the main module is using Address Space Layout Randomization. You can also specify a function name in the export table of target module to narrow down the address.
+= Valid data form =
+=== SHIFT-JIS ===
+Most game engines use SHIFT-JIS encoding. SHIFT-JIS characters begins from 8140. Usually 2 bytes long. If you see a 2 byte data 8??? or 9???, it's probably a SHIFT-JIS character. If 8? is at high address, use A, otherwise use B to represent SHIFT-JIS character
+=== Unicode ===
+There are also many engines using Unicode encoding. Japanese character (Hiragana and Katakata)in Unicode starts from 3000. But Kanji characters spread in a great range. Unicode characters are always 2 bytes long. Look for 2 bytes data with the form 30?? is good. Use W to represent Unicode character.
+=== String ===
+If you find a big block of text and is null terminated, you can use string. S for SHIFT-JIS and Q for Unicode. Note that value is a pointer of the first character. So there is already a level of indirection. 
+
+= Valid split parameter form =
+There is no fixed format for split parameter. Split parameter is used to split text stream from one hook into different threads. It's only necessary to be different if you want to split the text. 
+
+= Examples =
+Now I take some examples to demonstrate the whole process to build a hook.<br>
+1. Font caching issue<br>
+Example BGI engine. 素晴らしき日々
+Default hook gives a thread from TextOutA. Set breakpoint at TextOutA.
+Called from 41F1F2. We navigate to the entry of current function -- 41F1A0.
+Set a breakpoint there and let the process fly. 
+We can observe that process breaks at 41F1A0 as many times as TextOutA.
+So we continue step out. 41F1A0 is called from 41F45A. Entry of this function is 41F400.
+This time process breaks at 41F400 more than TextOutA, as well as 41F1A0.
+At 41F400, EAX contains data we want.
+/HA-4@41F400. 
