@@ -48,7 +48,7 @@ name: Export function name. Case sensitive.
 
 Some examples:<br> 
 {{{/HA-4@41F400}}} -> SHIFT-JIS character in EAX, 8? at AH.<br>
-{{{/HS4@CE1F0:koisora_main.exe}}} -> If koisora_main is mapped at 400000, insert address is 400000+CE1F0=10E1F0. First cell below stack contains a SHIFT-JIS string pointer.<br>
+{{{/HS4@CE1F0:koisora_main.exe}}} -> If koisora_main is mapped at 400000, insert address is 400000+CE1F0=10E1F0. {{{[ESP+4]}}} contains a SHIFT-JIS string pointer.<br>
 {{{/HWN-10*-8:-10*10@46AE28}}} -> Unicode character at {{{[EBX-8]}}}, split parameter at {{{[EBX+10]}}}, zero default split parameter.
 
 
