@@ -2242,9 +2242,10 @@ void ProfileWindow::ImportCurrentProfile()
 			str2=str;
 			while (*str2!=L'\n') str2++;
 			*str2=0;
-			Parse(str2,hp);
+			Parse(_wcslwr(str)+2,hp);
 			pf.AddHook(hp);
 			flag++;
+			str=str2;
 		}		
 
 		str=str1;						
@@ -2322,7 +2323,7 @@ void ProfileWindow::ImportCurrentProfile()
 		while (*str<20&&*str) str++;
 		if (swscanf(str,L"%x",&flag)!=1) return;
 		pf.select_index=(flag+1)&0xFFFF;
-		MessageBox(0,L"Success",0,0);
+		MessageBox(0,L"Success",L"Success",0);
 		pfn->data=pf;
 		
 		flag=man->GetProcessIDByPath(pfn->key);
