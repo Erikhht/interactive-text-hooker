@@ -13,6 +13,7 @@ When perform attach operation, ITH will inject a DLL into target process. The DL
 5. Copy original instruction after hook code, do necessary modifications(any position relative instruction, jmp,call, etc)
 and insert a JMP $(E9) at the end. Here $ stands for the next instruction at the target address.
 
+Assume the program is a loop. 1-10 is address of 10 instruction. If insert hook at 5 and hook code at 15-20. The execution flow will be 1-4, jmp to 15, 15-20, 5, jmp back to 6, 6-10.
 This technique let you intercept program execution, and do anything you want at that point. ITH applies this technique to text processing related routes to intercept text. At a certain point ITH can<br>
   * Read all register value<br>
   * Access most memory except the stack above current ESP.
