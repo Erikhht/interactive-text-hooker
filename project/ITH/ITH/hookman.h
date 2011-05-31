@@ -79,7 +79,7 @@ public:
 	void SetCurrent(TextThread* it);
 	void SelectCurrent(LPWSTR str);
 	void AddText(DWORD pid, BYTE* text, DWORD hook, DWORD retn, DWORD split, int len);
-	void AddConsoleOutput(LPWSTR text);
+	void AddConsoleOutput(LPCWSTR text);
 	void AddLink(WORD from, WORD to);
 	void ClearText(DWORD pid, DWORD hook, DWORD retn, DWORD split);
 	void ClearCurrent();

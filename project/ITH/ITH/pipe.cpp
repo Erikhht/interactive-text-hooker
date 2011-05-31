@@ -65,11 +65,11 @@ void CreateNewPipe()
 	LARGE_INTEGER time={-500000,-1};
 	if (!NT_SUCCESS(NtCreateNamedPipeFile(&hTextPipe,GENERIC_READ|SYNCHRONIZE,&oa,&ios,
 		FILE_SHARE_WRITE,FILE_OPEN_IF,FILE_SYNCHRONOUS_IO_NONALERT,1,1,0,-1,0x1000,0x1000,&time)))
-	{ConsoleOutput(L"Can't create text pipe or too many instance.");return;}
+	{ConsoleOutput(ErrorCreatePipe);return;}
 	RtlInitUnicodeString(&us,command);
 	if (!NT_SUCCESS(NtCreateNamedPipeFile(&hCmdPipe,GENERIC_WRITE|SYNCHRONIZE,&oa,&ios,
 		FILE_SHARE_READ,FILE_OPEN_IF,FILE_SYNCHRONOUS_IO_NONALERT,1,1,0,-1,0x1000,0x1000,&time)))
-	{ConsoleOutput(L"Can't create cmd pipe or too many instance.");return;}
+	{ConsoleOutput(ErrorCreatePipe);return;}
 	man->RegisterPipe(hTextPipe,hCmdPipe);
 	NtClose(IthCreateThread(RecvThread,(DWORD)hTextPipe));
 }
@@ -175,7 +175,7 @@ DWORD WINAPI RecvThread(LPVOID lpThreadParameter)
 	man->UnRegisterProcess(pid);
 	NtClearEvent(hDetachEvent);
 	LeaveCriticalSection(&detach_cs);
-	swprintf((LPWSTR)buff,L"Process %d detached.",pid);
+	swprintf((LPWSTR)buff,FormatDetach,pid);
 	ConsoleOutput((LPWSTR)buff);
 	NtClose(IthCreateThread(UpdateWindows,0));
 	delete buff;
@@ -200,7 +200,7 @@ CommandQueue::~CommandQueue()
 }
 void CommandQueue::AddRequest(const SendParam& sp, DWORD pid)
 {
-	if (current==used) ConsoleOutput(L"Command queue full.");
+	if (current==used) ConsoleOutput(ErrorCmdQueueFull);
 	EnterCriticalSection(&rw);
 	queue[current]=sp;
 	if (pid) pid_associate[current++]=pid;
@@ -208,7 +208,7 @@ void CommandQueue::AddRequest(const SendParam& sp, DWORD pid)
 	{
 		pid=man->GetCurrentPID();
 		if (pid) pid_associate[current++]=pid;
-		else ConsoleOutput(L"No process attached.");
+		else ConsoleOutput(ErrorNoAttach);
 	}
 	current&=(QUEUE_MAX-1);
 	LeaveCriticalSection(&rw);

@@ -72,7 +72,7 @@ DWORD WINAPI MonitorThread(LPVOID lpThreadParameter)
 			NtAllocateVirtualMemory(NtCurrentProcess(),&addr,0,&size,MEM_COMMIT,PAGE_READWRITE);
 			status=NtQuerySystemInformation(SystemProcessInformation,addr,size,&rs);
 		}
-		if (!NT_SUCCESS(status)) {man->AddConsoleOutput(L"Can't monitor process");break;}
+		if (!NT_SUCCESS(status)) {man->AddConsoleOutput(ErrorMonitor);break;}
 		for (spiProcessInfo=(SYSTEM_PROCESS_INFORMATION*)addr; MonitorFlag&&spiProcessInfo->dNext;)
 		{
 			IthSleep(process_time);

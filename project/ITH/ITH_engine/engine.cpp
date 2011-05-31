@@ -1632,11 +1632,11 @@ extern "C" DWORD __declspec(dllexport) DetermineEngineType()
 		InsertRUGPHook();
 		return 0;
 	}
-	if (wcsstr(str,L"malie"))
+	/*if (wcsstr(str,L"malie"))
 	{
-		InsertMalieHook();
+		//InsertMalieHook();
 		return 0;
-	}
+	}*/
 	if (wcsstr(str,L"igs_sample"))
 	{
 		InsertIronGameSystemHook();

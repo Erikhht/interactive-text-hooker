@@ -18,8 +18,9 @@
 #include "window.h"
 #include "resource.h"
 #include <commctrl.h>
-LPCWSTR ClassName=L"ITH";
-LPCWSTR ClassNameAdmin=L"ITH (Administrator)";
+#include <Richedit.h>
+//LPCWSTR ClassName=L"ITH";
+//LPCWSTR ClassNameAdmin=L"ITH (Administrator)";
 LPWSTR import_buffer;
 int import_buffer_len;
 static WNDPROC proc,proccmd;
@@ -1589,7 +1590,7 @@ void ProcessWindow::DetachProcess()
 	DWORD pid=GetSelectPID();
 	if (ActiveDetachProcess(pid)==0) 
 	{
-		SetWindowText(heOutput,L"ITH detach from process");
+		SetWindowText(heOutput,L"ITH detach from process.");
 		EnableWindow(hbDetach,FALSE);
 		EnableWindow(hbAddProfile,FALSE);
 		EnableWindow(hbAttach,TRUE);
@@ -2179,6 +2180,8 @@ void ProfileWindow::ExportCurrentProfile()
 	HANDLE hFile=IthPromptCreateFile(GENERIC_WRITE,FILE_SHARE_READ,FILE_OVERWRITE_IF);
 	MyVector<WCHAR,0x1000,WCMP> export_text;
 	ProfileNode* pfn=pfman->GetProfile(index);
+	WCHAR bom=0xFEFF;
+	export_text.AddToStore(&bom,1);
 	if (hFile!=INVALID_HANDLE_VALUE&&pfn!=0)
 	{
 		ExportSingleProfile(pfn,export_text);
@@ -2194,7 +2197,8 @@ void ProfileWindow::ExportAllProfile()
 	HANDLE hFile=IthPromptCreateFile(GENERIC_WRITE,FILE_SHARE_READ,FILE_OVERWRITE_IF);
 	if (hFile==INVALID_HANDLE_VALUE) return;
 	MyVector<WCHAR,0x1000,WCMP> export_text;
-	export_text.AddToStore(L"ê≥\r\n",3);
+	WCHAR bom=0xFEFF;
+	export_text.AddToStore(&bom,1);
 	for (index=0;index<count;index++)
 	{
 		ProfileNode* pfn=pfman->GetProfile(index);

@@ -65,10 +65,15 @@ public:
 	}
 	void ClearMemory(int offset, int clear_size)
 	{
-		if (offset+clear_size<size)
+		if (clear_size<0) return;
+		EnterCriticalSection(&cs_store);
+		if (offset+clear_size<=size)
 		{
+			
 			memset(storage+offset,0,clear_size*sizeof(T));
+			
 		}
+		LeaveCriticalSection(&cs_store);
 		//else __asm int 3
 	}
 	void AddToStore(T* con,int amount)

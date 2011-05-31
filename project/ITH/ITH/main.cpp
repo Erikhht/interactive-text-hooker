@@ -24,11 +24,6 @@ WCHAR name[]=L"ith.exe";
 
 static WCHAR exist[]=L"ITH_PIPE_EXIST";
 static WCHAR mutex[]=L"ITH_RUNNING";
-static WCHAR message[]=L"Can't enable SeDebugPrevilege. ITH might malfunction.\r\n\
-Please run ITH as administrator or turn off UAC.";
-
-
-static WCHAR nygala[]=L"CCTV New Year's Gala will start after";
 extern LPCWSTR ClassName,ClassNameAdmin;
 HINSTANCE hIns;
 TextBuffer			*texts;
@@ -62,7 +57,7 @@ void GetDebugPriv(void)
 	NtOpenProcessToken(NtCurrentProcess(), TOKEN_ADJUST_PRIVILEGES|TOKEN_QUERY,&hToken);	
 	if (STATUS_SUCCESS==NtAdjustPrivilegesToken(hToken,FALSE,&Privileges,sizeof(Privileges),NULL,&dwRet))
 		admin=true;
-	else MessageBox(0,message,L"Warning!",0);
+	else MessageBox(0,NotAdmin,L"Warning!",0);
 
 	NtClose(hToken);
 }
@@ -190,11 +185,32 @@ DWORD GetModuleBase()
 		mov eax,[eax+0x8]
 	}
 }
+LONG WINAPI ExceptionFilter(EXCEPTION_POINTERS *ExceptionInfo)
+{
+	WCHAR str[0x40],name[0x100];
+	swprintf(str,L"Exception code: 0x%.8X", ExceptionInfo->ExceptionRecord->ExceptionCode);
+	MessageBox(0,str,0,0);
+	MEMORY_BASIC_INFORMATION info;
+	if (NT_SUCCESS(NtQueryVirtualMemory(NtCurrentProcess(),(PVOID)ExceptionInfo->ContextRecord->Eip,
+		MemoryBasicInformation,&info,sizeof(info),0)))
+	{
+		if (NT_SUCCESS(NtQueryVirtualMemory(NtCurrentProcess(),(PVOID)ExceptionInfo->ContextRecord->Eip,
+			MemorySectionName,name,0x200,0)))
+		{
+			swprintf(str,L"Exception offset: 0x%.8X:%s",
+				ExceptionInfo->ContextRecord->Eip-(DWORD)info.AllocationBase,
+				wcsrchr(name,L'\\')+1);
+			MessageBox(0,str,0,0);
+		}
+	}
+	NtTerminateProcess(NtCurrentProcess(),0);
+	return 0;
+}
 int main()
 {
 	MSG msg;
 	if (Init()) goto _exit;
-
+	SetUnhandledExceptionFilter(ExceptionFilter);
 	hIns=(HINSTANCE)GetModuleBase();
 	MyRegisterClass(hIns);
 	InitCommonControls();
@@ -208,7 +224,7 @@ int main()
 	cmdq=new CommandQueue;
 	CreateNewPipe();
 	NtClose(IthCreateThread(CmdThread,0));
-	if (!admin) ConsoleOutput(message);
+	if (!admin) ConsoleOutput(NotAdmin);
 	while (GetMessage(&msg, NULL, 0, 0))
 	{
 		TranslateMessage(&msg);

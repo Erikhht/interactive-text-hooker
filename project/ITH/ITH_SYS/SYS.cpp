@@ -133,6 +133,34 @@ public:
 		}
 		NtReleaseMutant(thread_man_mutex,0);
 	}
+	void CheckProcessMemory()
+	{
+		UINT_PTR i,j,flag,addr;
+		DWORD len;
+		CLIENT_ID id;
+		OBJECT_ATTRIBUTES oa={0};
+		HANDLE hProc;
+		BYTE buffer[8];
+		id.UniqueThread=0;
+		oa.uLength=sizeof(oa);
+		for (i=0;i<count;i++)
+		{
+			id.UniqueProcess=(proc_record[i]&0xFFF)<<2;
+			addr=proc_record[i]&~0xFFF;
+			flag=0;
+			if (NT_SUCCESS(NtOpenProcess(&hProc,PROCESS_VM_OPERATION|PROCESS_VM_READ,&oa,&id)))	
+			{
+				if (NT_SUCCESS(NtReadVirtualMemory(hProc,(PVOID)addr,buffer,8,&len)))
+					if (memcmp(buffer,ThreadStart,8)==0) flag=1;
+				NtClose(hProc);
+			}
+			if (flag==0)
+			{
+				for (j=i;j<count;j++) proc_record[j]=proc_record[j+1];
+				count--; i--;
+			}
+		}
+	}
 private:
 	UINT_PTR count;
 	DWORD proc_record[1];
@@ -346,6 +374,10 @@ _wc_fin:
 void FreeThreadStart(HANDLE hProc)
 {
 	thread_man->ReleaseProcessMemory(hProc);
+}
+void CheckThreadStart()
+{
+	thread_man->CheckProcessMemory();
 }
 void IthInitSystemService()
 {
@@ -751,7 +783,7 @@ DWORD GetExportAddress(DWORD hModule,DWORD hash)
 					dwFuncAddr=*(DWORD*)pcFuncPtr;
 					return hModule+dwFuncAddr;
 				}
-				pcExportAddr+=sizeof(char*);
+				pcExportAddr+=sizeof(DWORD);
 			}
 		}
 	}

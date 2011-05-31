@@ -1,3 +1,19 @@
+/*  Copyright (C) 2010-2011  kaosu (qiupf2000@gmail.com)
+ *  This file is part of the Interactive Text Hooker.
+
+ *  Interactive Text Hooker is free software: you can redistribute it and/or
+ *  modify it under the terms of the GNU General Public License as published
+ *  by the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 #pragma once
 #define STACK_SIZE 32
 #ifndef ITH_STACK
@@ -278,7 +294,7 @@ public:
 	{
 		TreeNode<T*,D>* Find=head.Left;
 		char k;
-		while (Find!=0&&Find->key!=key)
+		while (Find!=0)//&&Find->key!=key)
 		{
 			k=fCmp(key, Find->key);
 			if (k==0) break;
@@ -475,17 +491,11 @@ protected:
 		else {DownNode->rank+=ModifyNode->rank;BalanceNode->rank-=DownNode->rank;}
 		return DownNode;
 	}
-	__forceinline TreeNode<T*,D>*& _FactorLink(TreeNode<T*,D>* Node, char factor)
+	inline TreeNode<T*,D>*& __fastcall _FactorLink(TreeNode<T*,D>* Node, char factor)
 		//Private helper method to retrieve child according to factor.
 		//Return right child if factor>0 and left child otherwise.
 	{
-		__asm
-		{
-			mov ecx, Node
-			movsx eax, factor
-			lea eax,[eax*2+ecx+2]
-		}
-		//return factor>0? Node->Right : Node->Left;
+		return factor>0? Node->Right : Node->Left;
 	}
 	void _IncreaseHeight()
 	{

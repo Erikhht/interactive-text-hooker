@@ -16,11 +16,10 @@
  */
 #include "hookman.h"
 #include "profile.h"
+#include <xmmintrin.h>
 #define MAX_ENTRY 0x40
 //#include <richedit.h>
 WCHAR user_entry[0x40];
-static LPWSTR init_message=L"Interactive Text Hooker 2.2 (2011.5.3)\r\n\
-Copyright (C) 2010-2011  kaosu (qiupf2000@gmail.com)\r\n";
 static BYTE null_buffer[4]={0,0,0,0};
 static BYTE static_small_buffer[0x100];
 extern BYTE* static_large_buffer;
@@ -87,11 +86,6 @@ int GetHookString(LPWSTR str, DWORD pid, DWORD hook_addr, DWORD status)
 	str+=swprintf(str,L"%4d:0x%08X:",pid,hook_addr); 
 	str+=GetHookName(str,pid,hook_addr);
 	return str-begin;
-}
-
-void CALLBACK AddFun(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime)
-{
-	texts->Flush();
 }
 
 void CALLBACK NewLineBuff(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime)
@@ -166,7 +160,6 @@ void BitMap::Clear(DWORD number)
 	map[number>>3]&=~(1<<(number&7));
 }
 
-//extern "C" __declspec(dllimport) int printf(const char*,...);
 TextBuffer::TextBuffer():line(false),unicode(false)
 {
 	NtClose(IthCreateThread(FlushThread,(DWORD)this));
@@ -186,7 +179,6 @@ void TextBuffer::AddNewLIne()
 {
 
 }
-static BYTE replace_buffer[0x400];
 void TextBuffer::ReplaceSentence(BYTE* text, int len)
 {
 	if (len==0) return;
@@ -283,7 +275,37 @@ TextThread* ThreadTable::FindThread(DWORD number)
 	else return 0;
 }
 
-__forceinline int TCmp::operator()(const ThreadParameter* t1, const ThreadParameter* t2)
+char table[0x100]={
+	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, //0, equal
+	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //1, compare 1
+	1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, //2, compare 2
+	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //3, compare 1
+	1,1,1,1, -1,-1,-1,-1, 1,1,1,1, -1,-1,-1,-1, //4, compare 3
+	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //5, compare 1
+	1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, //6, compare 2
+	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //7, compare 1
+	1,1,1,1, 1,1,1,1, -1,-1,-1,-1, -1,-1,-1,-1, //8, compare 4
+	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //9, compare 1
+	1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, //a, compare 2
+	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //b, compare 1
+	1,1,1,1, -1,-1,-1,-1, 1,1,1,1, -1,-1,-1,-1, //c, compare 3
+	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //d, compare 1
+	1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, //e, compare 2
+	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1  //f, compare 1
+};
+int TCmp::operator()(const ThreadParameter* t1, const ThreadParameter* t2)
+{
+	__m128 d0,d1,d2;
+	int m0,m1;
+	d0 = _mm_loadu_ps((const float*)t1);
+	d1 = _mm_loadu_ps((const float*)t2);
+	d2 = _mm_cmpneq_ps(d0,d1);
+	d0 = _mm_cmplt_ps(d0,d1);	
+	m0 = _mm_movemask_ps(d0);
+	m1 = _mm_movemask_ps(d2);
+	return table[m1*16+m0];
+}
+/*int TCmp::operator()(const ThreadParameter* t1, const ThreadParameter* t2)
 {
 	DWORD t;
 	t=t1->pid-t2->pid;
@@ -296,12 +318,15 @@ __forceinline int TCmp::operator()(const ThreadParameter* t1, const ThreadParame
 			if (t==0) 
 			{
 				t=t1->spl-t2->spl;
-				if (t==0) return 0;
+				if (t==0) goto _cmps;
 			}
 		}
 	}
-	return (t&0x80000000)?-1:1;
-}
+	t = (t&0x80000000)?-1:1;
+_cmps:
+	if (t!=cmpopr(t1,t2)) __asm int 3;
+	return t;
+}*/
 void TCpy::operator()(ThreadParameter* t1, ThreadParameter* t2)
 {
 	memcpy(t1,t2,sizeof(ThreadParameter));
@@ -326,7 +351,7 @@ HookManager::HookManager()
 	texts->SetUnicode(true);
 	entry->AddToCombo();
 	entry->ComboSelectCurrent();
-	entry->AddToStore((BYTE*)init_message,wcslen(init_message)<<1,0,1);
+	entry->AddToStore((BYTE*)InitMessage,wcslen(InitMessage)<<1,0,1);
 	InitializeCriticalSection(&hmcs);
 }
 HookManager::~HookManager()
@@ -534,7 +559,7 @@ void HookManager::RegisterProcess(DWORD pid, DWORD hookman, DWORD module, DWORD 
 		&oa,&id))) record[register_count-1].process_handle=hProc;
 	else
 	{
-		man->AddConsoleOutput(L"Can't open process");
+		man->AddConsoleOutput(ErrorOpenProcess);
 		return;
 	}
 	
@@ -615,22 +640,22 @@ void HookManager::AddLink(WORD from, WORD to)
 	{
 		if (from_thread->Link()==to_thread) 
 		{
-			AddConsoleOutput(L"Link exist");
+			AddConsoleOutput(ErrorLinkExist);
 			return;
 		}
 		if (to_thread->CheckCycle(from_thread))
-			AddConsoleOutput(L"Link failed. No cyclic link allowed.");
+			AddConsoleOutput(ErrorCylicLink);
 		else
 		{
 			from_thread->Link()=to_thread;
 			from_thread->LinkNumber()=to;
 			WCHAR str[0x40];
-			swprintf(str,L"Link from thread%.4x to thread%.4x.",from,to);
+			swprintf(str,FormatLink,from,to);
 			AddConsoleOutput(str);
 		}
 	}
 	else 
-		AddConsoleOutput(L"Link failed. Source or/and destination thread not found.");
+		AddConsoleOutput(ErrorLink);
 	LeaveCriticalSection(&hmcs);
 }
 void HookManager::AddText(DWORD pid, BYTE* text, DWORD hook, DWORD retn, DWORD spl, int len)
@@ -666,7 +691,7 @@ void HookManager::AddText(DWORD pid, BYTE* text, DWORD hook, DWORD retn, DWORD s
 	LeaveCriticalSection(&hmcs);
 	it->AddToStore(text,len,false,number==0);
 }
-void HookManager::AddConsoleOutput(LPWSTR text)
+void HookManager::AddConsoleOutput(LPCWSTR text)
 {
 	if (text)
 	{
@@ -1098,6 +1123,7 @@ void TextThread::RemoveCyclicRepeat(BYTE* &con, int &len)
 				
 				if (status&CURRENT_SELECT)
 					texts->ReplaceSentence(storage+last_sentence+half_length,repeat_index);
+				if (repeat_index<0) __asm int 3;
 				ClearMemory(last_sentence+half_length,repeat_index);
 				used-=repeat_index;
 				repeat_index=0;
@@ -1126,6 +1152,7 @@ void TextThread::RemoveCyclicRepeat(BYTE* &con, int &len)
 				{
 					DWORD u=used;
 					while (memcmp(storage+u-len,con,len)==0) u-=len;
+					if (used<u) __asm int 3;
 					ClearMemory(u,used-u);
 					used=u;
 					repeat_index=0;
@@ -1147,6 +1174,7 @@ _again:
 					if (index>last_sentence)
 					{
 						tmp_len=used-index;
+						if (tmp_len&0x80000000) __asm int 3;
 						if  (memcmp(storage+index-tmp_len,storage+index,tmp_len)==0)
 						{
 							repeat_detect_limit=0x80;
@@ -1190,6 +1218,7 @@ _again:
 							index+=sentence_length;
 							if (status&CURRENT_SELECT) 
 								texts->ReplaceSentence(storage+index,used-index);
+							if (used<index) __asm int 3
 							ClearMemory(index,used-index);
 							//memset(storage+index,0,used-index);
 							used=index;
@@ -1308,9 +1337,11 @@ void TextThread::ResetEditText()
 	WCHAR *wc,null[2]={0};
 	bool uni=(status&USING_UNICODE)>0;
 	bool flag=false;
+	EnterCriticalSection(&cs_store);
 	if (uni) 
 	{
-		wc=(LPWSTR)storage;
+		
+		//wc=(LPWSTR)storage;
 		if (used>=8)
 			flag=(wcscmp((LPWSTR)(storage+used-8),L"\r\n\r\n")==0);
 		if (flag) 
@@ -1318,12 +1349,14 @@ void TextThread::ResetEditText()
 			used-=8;
 			memset(storage+used,0,8);
 		}
+		wc=new WCHAR[(used>>1)+1];
+		memcpy(wc,storage,used);
+		wc[used>>1]=0;
 	}
 	else
 	{
-		EnterCriticalSection(&cs_store);
-		len=used+(used>>1);
-		if (len) wc=new WCHAR[len];
+		len=used;
+		if (len) wc=new WCHAR[len+1];
 		else wc=null;
 		if (used>=4)
 			flag=(strcmp((char*)(storage+used-4),"\r\n\r\n")==0);
@@ -1332,9 +1365,9 @@ void TextThread::ResetEditText()
 			used-=4;
 			memset(storage+used,0,4);
 		}
-		wc[MB_WC((char*)storage,wc)]=0;
-		LeaveCriticalSection(&cs_store);
+		wc[MB_WC((char*)storage,wc)]=0;	
 	}
+	LeaveCriticalSection(&cs_store);
 	if (man)
 	man->SetCurrent(this);
 	texts->SetUnicode(uni);
@@ -1350,19 +1383,15 @@ void TextThread::ResetEditText()
 		if (uni)
 		{
 			MyVector::AddToStore((BYTE*)L"\r\n\r\n",8);
-			//memcpy(storage+used,L"\r\n\r\n",10);
-			//used+=8;
 			texts->AddText((BYTE*)L"\r\n\r\n",8,true);
 		}
 		else
 		{
 			MyVector::AddToStore((BYTE*)"\r\n\r\n",4);
-			//memcpy(storage+used,"\r\n\r\n",5);
-			//used+=4;
 			texts->AddText((BYTE*)"\r\n\r\n",4,true);
 		}
 	}
-	if (wc!=(LPWSTR)storage&&wc!=null) delete wc;
+	if (wc!=null) delete wc;
 }
 void TextThread::ComboSelectCurrent()
 {
@@ -1502,7 +1531,7 @@ bool TextThread::RemoveFromCombo()
 	j=SendMessage(hwndCombo,CB_GETCURSEL,0,0);
 	if (i==CB_ERR) return false;
 	if (SendMessage(hwndCombo,CB_DELETESTRING,i,0)==CB_ERR) 
-		man->AddConsoleOutput(L"Error delete from combo.");
+		man->AddConsoleOutput(ErrorDeleteCombo);
 	return (i==j);
 }
 bool TextThread::CheckCycle(TextThread* start)
@@ -1566,7 +1595,7 @@ void CopyToClipboard(void* str,bool unicode, int len)
 		}
 	}
 }
-void ConsoleOutput(LPWSTR text)
+void ConsoleOutput(const LPCWSTR text)
 {
 	man->AddConsoleOutput(text);
 }

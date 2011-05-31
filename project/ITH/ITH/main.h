@@ -20,6 +20,7 @@
 #include "..\common.h"
 #include "..\ntdll.h"
 #include "..\sys.h"
+#include "language.h"
 #pragma comment(linker,"/manifestdependency:\"type='win32' "\
 	"name='Microsoft.Windows.Common-Controls' version='6.0.0.0' "\
 	"processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
@@ -53,7 +54,7 @@ DWORD WINAPI RecvThread(LPVOID lpThreadParameter);
 DWORD WINAPI CmdThread(LPVOID lpThreadParameter);
 
 void CopyToClipboard(void* str,bool unicode, int len);
-void ConsoleOutput(LPWSTR text);
+void ConsoleOutput(LPCWSTR text);
 DWORD	GetCurrentPID();
 DWORD	GetPIDByHandle(HANDLE h);
 DWORD	GetHookManByPID(DWORD pid);

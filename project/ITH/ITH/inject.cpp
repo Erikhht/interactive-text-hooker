@@ -47,7 +47,7 @@ DWORD Inject(HANDLE hProc)
 	hTH=IthCreateThread(LoadLibrary,(DWORD)lpvAllocAddr,hProc);
 	if (hTH==0||hTH==INVALID_HANDLE_VALUE)
 	{
-		ConsoleOutput(L"Can't create remote thread.");
+		ConsoleOutput(ErrorRemoteThread);
 		return -1;
 	}
 	NtWaitForSingleObject(hTH,0,0);
@@ -59,7 +59,7 @@ DWORD Inject(HANDLE hProc)
 	hTH=IthCreateThread(LoadLibrary,(DWORD)lpvAllocAddr,hProc);
 	if (hTH==0||hTH==INVALID_HANDLE_VALUE)
 	{
-		ConsoleOutput(L"Can't create remote thread.");
+		ConsoleOutput(ErrorRemoteThread);
 		return -1;
 	}
 	NtWaitForSingleObject(hTH,0,0);
@@ -96,7 +96,7 @@ DWORD PIDByName(LPWSTR pwcTarget)
 		}
 	}
 	if (dwPid==0) 
-		ConsoleOutput(L"Process not found!");
+		ConsoleOutput(ErrorNoProcess);
 	delete pbBuffer;
 	return dwPid;
 }
@@ -104,12 +104,12 @@ DWORD InjectByPID(DWORD pid)
 {
 	if (pid==current_process_id) 
 	{
-		ConsoleOutput(L"Please do not attach to ITH.exe");
+		ConsoleOutput(SelfAttach);
 		return -1;
 	}
 	if (GetModuleByPID(pid))
 	{
-		ConsoleOutput(L"Process already attached.");
+		ConsoleOutput(AlreadyAttach);
 		return -1;
 	}
 	CLIENT_ID id;
@@ -126,7 +126,7 @@ DWORD InjectByPID(DWORD pid)
 		PROCESS_VM_WRITE,
 		&oa,&id)))
 	{
-		ConsoleOutput(L"Can't open process.");
+		ConsoleOutput(ErrorOpenProcess);
 		return -1;
 	}
 	DWORD module=Inject(hProc);
@@ -134,7 +134,7 @@ DWORD InjectByPID(DWORD pid)
 	NtClose(hProc);
 	if (module==-1) return -1;
 	WCHAR str[0x80];
-	swprintf(str,L"Inject process %d. Module base %.8X",pid,module);
+	swprintf(str,FormatInject,pid,module);
 	ConsoleOutput(str);
 	return module;
 }

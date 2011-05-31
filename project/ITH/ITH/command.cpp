@@ -139,7 +139,7 @@ int PerformThread(DWORD dwPid, DWORD addr=0,ThreadOperation op=OutputInformation
 	delete pbBuffer;
 	return spiProcessInfo!=0;
 }
-int GetProcessMemory1(HANDLE hProc, DWORD& size, DWORD& ws)
+int GetProcessMemory(HANDLE hProc, DWORD& size, DWORD& ws)
 {
 	DWORD len=0x200,retl,s=0;
 	DWORD *buffer=0;
@@ -165,7 +165,7 @@ int GetProcessMemory1(HANDLE hProc, DWORD& size, DWORD& ws)
 	delete buffer;
 	return 1;
 }
-int GetProcessMemory(HANDLE hProc, DWORD& mem_size, DWORD& ws)
+int GetProcessMemory2(HANDLE hProc, DWORD& mem_size, DWORD& ws)
 {
 	DWORD len,retl,s;
 	LPVOID buffer=0;
@@ -538,7 +538,7 @@ DWORD CommandQueue::ProcessCommand(LPWSTR cmd, DWORD pid)
 			}
 			break;
 		default:
-			ConsoleOutput(L"Syntax error.");
+			ConsoleOutput(ErrorSyntax);
 		}
 		break;
 	/*}
