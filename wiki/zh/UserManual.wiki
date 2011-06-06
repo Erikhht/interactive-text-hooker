@@ -15,7 +15,7 @@ Interactive Text Hooker (ITH) 是日本文字游戏的文字提取工具。它�
 
 ITH包括3个文件，分别是ITH.exe，ITH.dll和ITH_engine.dll。这三个文件必须放在同一文件夹内。ITH需要管理员权限才能正常工作。如果使用的系统是Vista/7，则需要用管理员身份来运行ITH。 
 
-== 用启界面 ==
+== 用户界面 ==
 
 第一行包括8个按键<br>
 *Process*: 打开 _进程浏览器_ 。<br>
