@@ -63,12 +63,14 @@ public:
 	void RemoveSingleRepeatAuto(BYTE* con, int &len);
 	void RemoveSingleRepeatForce(BYTE* con, int &len);
 	void RemoveCyclicRepeat(BYTE* &con, int &len);
+	void ResetRepeatStatus();
 	void AddLineBreak();
 	void ResetEditText();
 	void ComboSelectCurrent();
 	void GetEntryString(LPWSTR str);
 	void CopyLastSentence(LPWSTR str);
 	void CopyLastToClipboard();
+	void ExportTextToFile(LPWSTR filename);
 	void AdjustPrevRepeat(DWORD len);
 	void PrevRepeatLength(DWORD &len);
 	void SetComment(LPWSTR);
@@ -95,7 +97,7 @@ private:
 	ThreadParameter tp;
 	
 	WORD number,link_number;
-	WORD last,flags;
+	WORD last,align_space;
 	WORD repeat_single;
 	WORD repeat_single_current;
 	WORD repeat_single_count;

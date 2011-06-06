@@ -18,7 +18,6 @@
 #include "window.h"
 #include "resource.h"
 #include <commctrl.h>
-#include <Richedit.h>
 //LPCWSTR ClassName=L"ITH";
 //LPCWSTR ClassNameAdmin=L"ITH (Administrator)";
 LPWSTR import_buffer;
@@ -298,7 +297,7 @@ BOOL CALLBACK OptionDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			{
 			case IDOK:
 				{
-					DWORD st,pt,jd,sd;
+					DWORD st,pt,jd,sd,repeat;
 					WCHAR str[0x80];
 					GetWindowText(GetDlgItem(hDlg,IDC_EDIT1),str,0x80);
 					swscanf(str,L"%d",&st);
@@ -313,7 +312,13 @@ BOOL CALLBACK OptionDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					swscanf(str,L"%d",&sd);
 					insert_delay=sd>200?sd:200;
 					GetWindowText(GetDlgItem(hDlg,IDC_EDIT5),str,0x80);
-					swscanf(str,L"%d",&repeat_count);
+
+					swscanf(str,L"%d",&repeat);
+					if (repeat!=repeat_count)
+					{
+						repeat_count=repeat;
+						man->ResetRepeatStatus();
+					}
 					auto_inject=IsDlgButtonChecked(hDlg,IDC_CHECK1);
 					auto_insert=IsDlgButtonChecked(hDlg,IDC_CHECK2);
 					clipboard_flag=IsDlgButtonChecked(hDlg,IDC_CHECK3)>0;
@@ -366,6 +371,12 @@ BOOL CALLBACK ThreadDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				break;
 			case IDC_BUTTON1:
 				thwnd->SetThread();
+				break;
+			case IDC_BUTTON2:
+				thwnd->ExportSingleThreadText();
+				break;
+			case IDC_BUTTON3:
+				thwnd->ExportAllThreadText();
 				break;
 			}
 			return TRUE;
@@ -1069,11 +1080,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				{
 				case CBN_SELENDOK:
 					{
-					if (h==hwndProc) return 0;
-					WCHAR pwcEntry[0x80]={0};
-					dwId=SendMessage(hwndCombo,CB_GETCURSEL,0,0);
-					int len=SendMessage(hwndCombo,CB_GETLBTEXT,dwId,(LPARAM)pwcEntry);
-					man->SelectCurrent(pwcEntry);
+						if (h==hwndProc) return 0;
+						//WCHAR pwcEntry[0x80]={0};
+						LPWSTR pwcEntry; int len;
+						dwId=SendMessage(hwndCombo,CB_GETCURSEL,0,0);
+						len=SendMessage(hwndCombo,CB_GETLBTEXTLEN,dwId,0);
+						if (len>0)
+						{
+							pwcEntry = new WCHAR[len+1];
+							len=SendMessage(hwndCombo,CB_GETLBTEXT,dwId,(LPARAM)pwcEntry);
+							man->SelectCurrent(pwcEntry);
+							delete pwcEntry;
+						}
 					}
 					return 0;
 				case BN_CLICKED:
@@ -1942,6 +1960,85 @@ void ThreadWindow::SetLastSentence(DWORD number)
 		str[0xFF]=0;
 		SetWindowText(heSentence,str);
 	}
+}
+void ThreadWindow::ExportAllThreadText()
+{
+	WCHAR str_buffer[0x200];
+	LPWSTR str,p,p1,p2;
+	LARGE_INTEGER time;
+	TIME_FIELDS tf;
+	TextThread* it;
+	if (GetWindowText(hwndProc,str_buffer,0x40))
+	{
+		str_buffer[0x3F]=L'.';
+		for (str=str_buffer;*str!=L'.';str++);
+		*str=0;
+		HANDLE h=IthCreateDirectory(str_buffer+5);
+		if (INVALID_HANDLE_VALUE==h) return;
+		NtClose(h);
+	}
+	ThreadTable* table=man->Table();
+	NtQuerySystemTime(&time);
+	RtlTimeToTimeFields(&time,&tf);
+	*str++=L'\\';
+	p=str+swprintf(str,L"%.4d-%.2d-%.2d-",tf.wYear,tf.wMonth,tf.wDay);
+	man->LockHookman();
+	for (int i=0;i<=table->Used();i++)
+	{
+		it=table->FindThread(i);
+		if (it==0) continue;
+		it->GetEntryString(p);
+		p1=p+5;p2=p+0x2B;
+		p[4]=L'-';
+		while (*p2)
+		{
+			*p1=*p2;
+			p1++;p2++;
+		}
+		p1[0]=L'.'; p1[1]=L't';
+		p1[2]=L'x'; p1[3]=L't';
+		p1[4]=0;
+		it->ExportTextToFile(str_buffer+5);
+	}
+	man->UnlockHookman();
+	MessageBox(0,L"Success",L"Success",0);
+}
+void ThreadWindow::ExportSingleThreadText()
+{
+	WCHAR entry_string[0x200]; 
+	LPWSTR p1,p2;
+	DWORD num,index;
+	LARGE_INTEGER time;
+	TIME_FIELDS tf;
+	TextThread* it;
+	ThreadTable* table=man->Table();
+	NtQuerySystemTime(&time);
+	RtlTimeToTimeFields(&time,&tf);
+	index=SendMessage(hcCurrentThread,CB_GETCURSEL,0,0);
+	SendMessage(hcCurrentThread,CB_GETLBTEXT,index,(LPARAM)entry_string);
+	swscanf(entry_string,L"%X",&num);
+	man->LockHookman();
+	it=table->FindThread(num);
+	if (it)
+	{
+		p1=entry_string+swprintf(entry_string,L"%.4d-%.2d-%.2d-%.4X-",tf.wYear,tf.wMonth,tf.wDay,num);
+		p2=entry_string+0x2B;
+		while (*p2)
+		{
+			*p1=*p2;
+			p1++;p2++;
+		}
+		p1[0]=L'.';
+		p1[1]=L't';
+		p1[2]=L'x';
+		p1[3]=L't';
+		p1[4]=0;
+		//wcscpy(p1,entry_string+0x2B);
+		//it->GetEntryString(p);
+		it->ExportTextToFile(entry_string);
+	}
+	man->UnlockHookman();
+	MessageBox(0,L"Success",L"Success",0);
 }
 
 ProfileWindow::ProfileWindow(HWND hDialog)

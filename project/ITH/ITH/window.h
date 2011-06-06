@@ -82,6 +82,8 @@ public:
 	void RemoveLink(int index);
 	void SetThread();
 	void SetLastSentence(DWORD select);
+	void ExportAllThreadText();
+	void ExportSingleThreadText();
 private:
 	HWND hDlg;
 	HWND hcCurrentThread,hcLinkThread;

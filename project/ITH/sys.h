@@ -33,6 +33,7 @@ BOOL IthFindFile(LPWSTR file);
 BOOL IthGetFileInfo(LPWSTR file, LPVOID info);
 BOOL IthCheckFileFullPath(LPWSTR file);
 HANDLE IthCreateFile(LPWSTR name, DWORD option, DWORD share, DWORD disposition);
+HANDLE IthCreateDirectory(LPWSTR name);
 HANDLE IthCreateFileFullPath(LPWSTR full_path, DWORD option, DWORD share, DWORD disposition);
 HANDLE IthPromptCreateFile(DWORD option, DWORD share, DWORD disposition);
 HANDLE IthCreateSection(LPWSTR name, DWORD size, DWORD right);
@@ -48,6 +49,7 @@ HANDLE IthCreateThread(LPVOID start_addr, DWORD param, HANDLE hProc=(HANDLE)-1);
 DWORD GetExportAddress(DWORD hModule,DWORD hash);
 void IthSleep(int time);
 void FreeThreadStart(HANDLE hProc);
+void CheckThreadStart();
 }
 extern HANDLE hHeap;
 extern DWORD current_process_id;

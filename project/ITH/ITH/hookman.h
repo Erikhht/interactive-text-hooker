@@ -83,6 +83,7 @@ public:
 	void AddLink(WORD from, WORD to);
 	void ClearText(DWORD pid, DWORD hook, DWORD retn, DWORD split);
 	void ClearCurrent();
+	void ResetRepeatStatus();
 	void LockHookman();
 	void UnlockHookman();
 	void LockProcessHookman(DWORD pid);

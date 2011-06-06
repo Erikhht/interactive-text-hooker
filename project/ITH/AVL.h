@@ -518,7 +518,7 @@ class SCMP
 public:
 	__forceinline char operator()(char* s1,char* s2)
 	{
-		__asm
+		/*__asm
 		{
 			push s1
 			push s2
@@ -529,10 +529,10 @@ public:
 			neg ecx
 			shr ecx,31
 			or eax,ecx
-		}
-		/*int t=_stricmp(s1,s2);
+		}*/
+		int t=_stricmp(s1,s2);
 		if (t==0) return 0;		
-		return t>0? 1:-1;*/
+		return t>0? 1:-1;
 	}
 };
 class SCPY
@@ -557,7 +557,7 @@ class WCMP
 public:
 	__forceinline char operator()(wchar_t* s1,wchar_t* s2)
 	{
-		__asm
+		/*__asm
 		{
 			push s1
 			push s2
@@ -568,10 +568,10 @@ public:
 			neg ecx
 			shr ecx,31
 			or eax,ecx
-		}
-		/*int t=_wcsicmp(s1,s2);
+		}*/
+		int t=_wcsicmp(s1,s2);
 		if (t==0) return 0;
-		return t>0? 1:-1;*/
+		return t>0? 1:-1;
 	}
 };
 class WCPY

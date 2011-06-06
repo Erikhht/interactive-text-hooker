@@ -1,20 +1,3 @@
-/*  Copyright (C) 2010-2011  kaosu (qiupf2000@gmail.com)
- *  This file is part of the Interactive Text Hooker.
-
- *  Interactive Text Hooker is free software: you can redistribute it and/or
- *  modify it under the terms of the GNU General Public License as published
- *  by the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
-
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
-
- *  You should have received a copy of the GNU General Public License
- *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 const wchar_t* Warning=L"Warning!";
 //command.cpp
 const wchar_t* ErrorSyntax=L"Syntax error";
@@ -38,7 +21,7 @@ const wchar_t* ErrorNoAttach=L"No process attached.";
 const wchar_t* ErrorMonitor=L"Can't monitor process.";
 
 //utility.cpp
-const wchar_t* InitMessage=L"Interactive Text Hooker 2.2 (2011.5.22)\r\n\
+const wchar_t* InitMessage=L"Interactive Text Hooker 2.2 (2011.6.6)\r\n\
 Copyright (C) 2010-2011  kaosu (qiupf2000@gmail.com)\r\n\
 Source code <http://code.google.com/p/interactive-text-hooker/>\r\n\
 General discussion <http://www.hongfire.com/forum/showthread.php?t=208860>\r\n";

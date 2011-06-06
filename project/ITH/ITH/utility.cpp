@@ -275,7 +275,7 @@ TextThread* ThreadTable::FindThread(DWORD number)
 	else return 0;
 }
 
-char table[0x100]={
+static const char table[0x100]={
 	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, //0, equal
 	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //1, compare 1
 	1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, //2, compare 2
@@ -294,6 +294,7 @@ char table[0x100]={
 	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1  //f, compare 1
 };
 int TCmp::operator()(const ThreadParameter* t1, const ThreadParameter* t2)
+	//SSE speed up. Compare 4 integer in const time without branching.
 {
 	__m128 d0,d1,d2;
 	int m0,m1;
@@ -566,7 +567,7 @@ void HookManager::RegisterProcess(DWORD pid, DWORD hookman, DWORD module, DWORD 
 	swprintf(str,L"ITH_HOOKMAN_%d",pid);
 	record[register_count-1].hookman_mutex=IthOpenMutex(str);
 	if (GetProcessPath(pid,path)==false) path[0]=0;
-	swprintf(str,L"%d:%s",pid,wcsrchr(path,L'\\')+1);
+	swprintf(str,L"%.4d:%s",pid,wcsrchr(path,L'\\')+1);
 	SendMessage(hwndProc,CB_ADDSTRING,0,(LPARAM)str);
 	if (SendMessage(hwndProc,CB_GETCOUNT,0,0)==1)
 		SendMessage(hwndProc,CB_SETCURSEL,0,0);
@@ -724,6 +725,19 @@ void HookManager::ClearCurrent()
 	EnterCriticalSection(&hmcs);
 	current->Reset();
 	current->ResetEditText();
+	LeaveCriticalSection(&hmcs);
+}
+void HookManager::ResetRepeatStatus()
+{
+	EnterCriticalSection(&hmcs);
+	int i;
+	TextThread* t;
+	for (i=1;i<table->Used();i++)
+	{
+		t=table->FindThread(i);
+		if (t==0) continue;
+		t->ResetRepeatStatus();
+	}
 	LeaveCriticalSection(&hmcs);
 }
 void HookManager::LockHookman(){EnterCriticalSection(&hmcs);}
@@ -964,6 +978,7 @@ TextThread::~TextThread()
 		t=tt->next;
 		delete tt;
 	}
+	head=0;
 	if (comment) {delete comment;comment=0;}
 	if (thread_string) {delete thread_string;thread_string=0;}
 }
@@ -1175,7 +1190,7 @@ _again:
 					{
 						tmp_len=used-index;
 						if (tmp_len&0x80000000) __asm int 3;
-						if  (memcmp(storage+index-tmp_len,storage+index,tmp_len)==0)
+						if  (index>=tmp_len&&memcmp(storage+index-tmp_len,storage+index,tmp_len)==0)
 						{
 							repeat_detect_limit=0x80;
 							sentence_length=tmp_len;
@@ -1235,6 +1250,23 @@ _again:
 		}
 	}
 	last_time=currnet_time;
+}
+void TextThread::ResetRepeatStatus()
+{
+	last=0;
+	repeat_single=0;
+	repeat_single_current=0;
+	repeat_single_count=0;
+	repeat_detect_count=0;
+	RepeatCountNode *t=head,*tt;
+	while (t)
+	{
+		tt=t;
+		t=tt->next;
+		delete tt;
+	}
+	head=0;
+	status&=~REPEAT_NUMBER_DECIDED;
 }
 void TextThread::AddLineBreak()
 {
@@ -1492,6 +1524,30 @@ void TextThread::CopyLastSentence(LPWSTR str)
 void TextThread::CopyLastToClipboard()
 {
 	CopyToClipboard(storage+last_sentence,(status&USING_UNICODE)>0,used-last_sentence);
+}
+void TextThread::ExportTextToFile(LPWSTR filename)
+{
+	HANDLE hFile=IthCreateFile(filename,GENERIC_WRITE,0,FILE_OPEN_IF);
+	if (hFile==INVALID_HANDLE_VALUE) return;
+	EnterCriticalSection(&cs_store);
+	IO_STATUS_BLOCK ios;
+	LPVOID buffer=storage;
+	DWORD len=used;
+	BYTE bom[4]={0xFF,0xFE,0,0};
+	LARGE_INTEGER offset={2,0};
+	if ((status&USING_UNICODE)==0)
+	{
+		len=MB_WC_count((char*)storage,used);
+		buffer=new WCHAR[len+1];
+		MB_WC((char*)storage,(wchar_t*)buffer);
+		len<<=1;
+	}
+	NtWriteFile(hFile,0,0,0,&ios,bom,2,0,0);
+	NtWriteFile(hFile,0,0,0,&ios,buffer,len,&offset,0);
+	NtFlushBuffersFile(hFile,&ios);
+	if (buffer!=storage) delete buffer;
+	NtClose(hFile);
+	LeaveCriticalSection(&cs_store);
 }
 void TextThread::SetComment(LPWSTR str)
 {
