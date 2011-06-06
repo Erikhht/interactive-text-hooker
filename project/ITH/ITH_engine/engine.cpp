@@ -261,17 +261,6 @@ DWORD FindCallAndEntryRel(DWORD fun, DWORD size, DWORD pt, DWORD sig)
 			OutputConsole(L"Find call and entry failed.");
 			return 0;
 }
-
-void SpecialHookKiriKiri(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
-{
-	DWORD p1,p2;
-	p1=*(DWORD*)(esp_base-0x14);
-	p2=*(DWORD*)(esp_base-0xC)<<24;
-	p1-=2;
-	*data=*(WORD*)(p1);
-	*split=p2|(*(DWORD*)(esp_base-0x20)>>8);
-	*len=2;
-}
 /********************************************************************************************
 KiriKiri hook:
 	Usually there are xp3 files in the game folder but also exceptions.
@@ -292,12 +281,34 @@ KiriKiri hook:
 	string. After the loop EBX will point to the end of the string. So EBX-2 is the last
 	char and we insert hook here to extract it.
 ********************************************************************************************/
+void SpecialHookKiriKiri(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+{
+	DWORD p1,p2,p3;
+	p1=*(DWORD*)(esp_base-0x14);
+	p2=*(DWORD*)(esp_base-0x18);
+	if ((p1>>16)==(p2>>16))
+	{
+		p3=*(DWORD*)p1;
+		if (p3)
+		{
+			p3+=8;
+			for (p2=p3+2;*(WORD*)p2;p2+=2);
+			*len=p2-p3;
+			*data=p3;
+			p1=*(DWORD*)(esp_base-0x20);
+			p1=*(DWORD*)(p1+0x74);
+			*split=*(DWORD*)(esp_base+0x48)|p1;
+		}
+		else *len=0;
+	}
+	else *len=0;
+}
 void FindKiriKiriHook(DWORD fun, DWORD size, DWORD pt, DWORD flag)
 {
 	DWORD t,i,j,k,addr,sig;
 	if (flag) sig=0x575653;
 	else sig=0xEC8B55;
-	WCHAR str[0x40];
+	//WCHAR str[0x40];
 	t=0;
 	for (i=0x1000;i<size-4;i++)
 	{
@@ -308,7 +319,7 @@ void FindKiriKiriHook(DWORD fun, DWORD size, DWORD pt, DWORD flag)
 			if (*(DWORD*)addr==fun) t++;
 			if (t==flag+1) //We find call to GetGlyphOutlineW or GetTextExtentPoint32W.
 			{
-				swprintf(str,L"CALL addr:0x%.8X",i+pt);
+				//swprintf(str,L"CALL addr:0x%.8X",i+pt);
 				//OutputConsole(str);
 				for (j=i;j>i-0x1000;j--)
 				{					
@@ -323,16 +334,18 @@ void FindKiriKiriHook(DWORD fun, DWORD size, DWORD pt, DWORD flag)
 									if (k+5+*(DWORD*)(pt+k+1)==j) t++;
 									if (t==2)
 									{
-										k+=0x14; 
-										swprintf(str,L"Hook addr: 0x%.8X",pt+k);
+										for (k+=pt+0x14; *(WORD*)(k)!=0xC483;k++);
+										//swprintf(str,L"Hook addr: 0x%.8X",pt+k);
 										//OutputConsole(str);
 										HookParam hp={0};
-										hp.addr=(DWORD)pt+k;
-										hp.off=-0x14;
+										hp.addr=k;
+										hp.extern_fun=(DWORD)SpecialHookKiriKiri;
+										hp.type=NO_CONTEXT|EXTERN_HOOK|USING_UNICODE|USING_SPLIT;
+										/*hp.off=-0x14;
 										hp.ind=-0x2;
 										hp.split=-0xC;
 										hp.length_offset=1;
-										hp.type|=USING_UNICODE|NO_CONTEXT|USING_SPLIT|DATA_INDIRECT;
+										hp.type|=USING_UNICODE|NO_CONTEXT|USING_SPLIT|DATA_INDIRECT;*/
 										NewHook(hp,L"KiriKiri2");
 										return;
 									}
@@ -340,7 +353,7 @@ void FindKiriKiriHook(DWORD fun, DWORD size, DWORD pt, DWORD flag)
 						}
 						else
 						{
-							swprintf(str,L"Hook addr: 0x%.8X",pt+j);
+							//swprintf(str,L"Hook addr: 0x%.8X",pt+j);
 							//OutputConsole(str);
 							HookParam hp={0};
 							hp.addr=(DWORD)pt+j;
@@ -764,7 +777,7 @@ void InsertAtelierHook()
 CIRCUS hook:
 	Game folder contains advdata folder. Used by CIRCUS games.
 	Usually has font caching issues. But trace back from GetGlyphOutline gives a hook
-	which generate repeatition.
+	which generate repetition.
 	If we study circus engine follow Freaka's video, we can easily discover that
 	in the game main module there is a static buffer, which is filled by new text before
 	it's drawing to screen. By setting a hardware breakpoint there we can locate the
@@ -1140,6 +1153,72 @@ void InsertMalieHook()
 	NewHook(hp,L"Malie");
 	RegisterEngineType(ENGINE_MALIE);
 }
+/********************************************************************************************
+EMEHook hook: (Contributed by Freaka)
+	EmonEngine is used by LoveJuice company and TakeOut. Earlier builds were apparently 
+	called Runrunengine. String parsing varies alot depending on the font settings and 
+	speed setting. E.g. without antialiasing (which very early versions did not have)
+	uses TextOutA, fast speed triggers different functions then slow/normal. The user can
+	set his own name and some odd control characters are used (0x09 for line break, 0x0D 
+	for paragraph end) which is parsed and put together on-the-fly while playing so script
+	can't be read directly. 
+********************************************************************************************/
+void InsertEMEHook()
+{
+	DWORD c=FindCallOrJmpAbs((DWORD)IsDBCSLeadByte,module_limit-module_base,(DWORD)module_base,false);
+	
+	/* no needed as first call to IsDBCSLeadByte is correct, but sig could be used for further verification 
+	WORD sig = 0x51C3;
+	while (c && (*(WORD*)(c-2)!=sig))
+	{
+		//-0x1000 as FindCallOrJmpAbs always uses an offset of 0x1000
+		c=FindCallOrJmpAbs((DWORD)IsDBCSLeadByte,module_limit-c-0x1000+4,c-0x1000+4,false);
+	} */
+
+	if (c)
+	{
+		HookParam hp={0};
+		hp.addr=c;
+		hp.off=-0x8;
+		hp.length_offset=1;
+		hp.type=NO_CONTEXT|DATA_INDIRECT;
+		NewHook(hp,L"EmonEngine");
+		OutputConsole(L"EmonEngine, hook will only work with text speed set to slow or normal!");
+	}
+	else OutputConsole(L"Unknown EmonEngine engine");
+}
+void SpecialRunrunEngine(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+{
+	DWORD p1=*(DWORD*)(esp_base-0x8)+*(DWORD*)(esp_base-0x10); //eax+edx
+	*data=*(WORD*)(p1);
+	*len=2;
+}
+void InsertRREHook()
+{
+	DWORD c=FindCallOrJmpAbs((DWORD)IsDBCSLeadByte,module_limit-module_base,(DWORD)module_base,false);
+	if (c)	
+	{
+		WORD sig = 0x51C3;
+		
+		HookParam hp={0};
+		hp.addr=c;	
+		hp.length_offset=1;
+		hp.type=NO_CONTEXT|DATA_INDIRECT;
+		if ((*(WORD*)(c-2)!=sig)) 
+		{
+			hp.extern_fun=(DWORD)SpecialRunrunEngine;
+			hp.type|=EXTERN_HOOK;
+			NewHook(hp,L"RunrunEngine Old");
+		} 
+		else
+		{		
+			hp.off=-0x8;	
+			NewHook(hp,L"RunrunEngine");
+		}
+		OutputConsole(L"RunrunEngine, hook will only work with text speed set to slow or normal!");
+	}
+	else OutputConsole(L"Unknown RunrunEngine engine");
+}
 static DWORD furi_flag;
 void SpecialHookMalie(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
 {
@@ -1237,11 +1316,27 @@ bool InsertLiveDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 	}
 	return true;
 }
-void InsertLiveHook()
+/*void InsertLiveHook()
 {
 	OutputConsole(L"Probably Live. Wait for text.");
 	SwitchTrigger();
 	trigger_fun=InsertLiveDynamicHook;
+}*/
+void InsertLiveHook()
+{
+	BYTE sig[7]={0x64,0x89,0x20,0x8B,0x45,0x0C,0x50};
+	DWORD i=SearchPattern(module_base,module_limit-module_base,sig,7);
+	if (i)
+	{
+		HookParam hp={0};
+		hp.addr=i+module_base;
+		hp.off=-0x10;
+		hp.length_offset=1;
+		hp.type|=BIG_ENDIAN;
+		NewHook(hp,L"Live");
+		RegisterEngineType(ENGINE_LIVE);
+	}
+	else OutputConsole(L"Unknown Live engine");
 }
 void InsertBrunsHook()
 {
@@ -1518,7 +1613,7 @@ extern "C" DWORD __declspec(dllexport) DetermineEngineType()
 		InsertBGIHook();
 		return 0;
 	}
-	if (IthCheckFile(L"data.arc")&&IthCheckFile(L"stream.arc"))
+	if (IthFindFile(L"data*.arc")&&IthCheckFile(L"stream.arc"))
 	{
 		InsertMajiroHook();
 		return 0;
@@ -1613,6 +1708,16 @@ extern "C" DWORD __declspec(dllexport) DetermineEngineType()
 	if (IthCheckFile(L"libscr.dll"))
 	{
 		InsertBrunsHook();
+		return 0;
+	}
+	if (IthFindFile(L"emecfg.ecf"))
+	{
+		InsertEMEHook();
+		return 0;
+	}
+	if (IthFindFile(L"rrecfg.rcf"))
+	{
+		InsertRREHook();
 		return 0;
 	}
 	wcscpy(str,process_name);
