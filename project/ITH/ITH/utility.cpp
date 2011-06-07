@@ -1042,6 +1042,11 @@ void TextThread::RemoveSingleRepeatAuto(BYTE* con,int &len)
 			if (last==*text) repeat_single_current++;
 			else 
 			{
+				if (last==0) 
+				{
+					last=*text;
+					return;
+				}
 				last=*text;
 				RepeatCountNode* it=head;
 				if (repeat_detect_count>MIN_DETECT)
@@ -1167,7 +1172,6 @@ void TextThread::RemoveCyclicRepeat(BYTE* &con, int &len)
 				{
 					DWORD u=used;
 					while (memcmp(storage+u-len,con,len)==0) u-=len;
-					if (used<u) __asm int 3;
 					ClearMemory(u,used-u);
 					used=u;
 					repeat_index=0;
@@ -1182,6 +1186,7 @@ void TextThread::RemoveCyclicRepeat(BYTE* &con, int &len)
 					DWORD index,last_index,tmp_len;
 					index=used-len;
 					if (index<last_sentence) index=last_sentence;
+					//Locate position of current input.
 _again:
 					*(WORD*)(storage+last_sentence)=*(WORD*)con;
 					while (*(WORD*)(storage+index)!=*(WORD*)con) index--;
@@ -1189,8 +1194,14 @@ _again:
 					if (index>last_sentence)
 					{
 						tmp_len=used-index;
-						if (tmp_len&0x80000000) __asm int 3;
-						if  (index>=tmp_len&&memcmp(storage+index-tmp_len,storage+index,tmp_len)==0)
+						if (tmp_len<=2)
+						{
+							repeat_detect_limit+=0x40;
+							last_time=currnet_time;
+							return;
+						}
+						if  (index-last_sentence>=tmp_len&&
+							memcmp(storage+index-tmp_len,storage+index,tmp_len)==0)
 						{
 							repeat_detect_limit=0x80;
 							sentence_length=tmp_len;
@@ -1233,7 +1244,7 @@ _again:
 							index+=sentence_length;
 							if (status&CURRENT_SELECT) 
 								texts->ReplaceSentence(storage+index,used-index);
-							if (used<index) __asm int 3
+							
 							ClearMemory(index,used-index);
 							//memset(storage+index,0,used-index);
 							used=index;
@@ -1315,11 +1326,19 @@ void TextThread::AddToStore(BYTE* con,int len, bool new_line,bool console)
 	if (con==0) return;
 	if (!new_line&&!console) 
 	{
-		if (repeat_count) RemoveSingleRepeatForce(con,len);
+		if (repeat_count) 
+		{
+			status|=REPEAT_NUMBER_DECIDED;
+			RemoveSingleRepeatForce(con,len);
+		}
 		else RemoveSingleRepeatAuto(con,len);
 	}
 	if (len<=0) return;
-	if(cyclic_remove&&!console) RemoveCyclicRepeat(con,len);
+	if(cyclic_remove&&!console) 
+	{
+		if (status&REPEAT_NUMBER_DECIDED)
+			RemoveCyclicRepeat(con,len);
+	}
 	if (len<=0) return;
 	if (status&BUFF_NEWLINE) AddLineBreak();
 	if (new_line)
