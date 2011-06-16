@@ -3741,7 +3741,7 @@ NTAPI
 RtlRunDecodeUnicodeString(BYTE bHash,PUNICODE_STRING uString);
 
 // added
-int sprintf(char *buffer,const char *format,...);
+
 
 typedef struct _TDI_CONNECTION_INFORMATION { 
   LONG  UserDataLength; 

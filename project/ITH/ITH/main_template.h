@@ -76,15 +76,16 @@ public:
 		LeaveCriticalSection(&cs_store);
 		//else __asm int 3
 	}
-	void AddToStore(T* con,int amount)
+	int AddToStore(T* con,int amount)
 	{
-		if (amount<=0||con==0) return;
+		if (amount<=0||con==0) return 0;
+		int status=0;
 		EnterCriticalSection(&cs_store);
 		if (amount+used+2>=size)
 		{
 			while (amount+used+2>=size) size<<=1;
 			T* temp;
-			if (size*sizeof(T)<0x100000)
+			if (size*sizeof(T)<0x1000000)
 			{
 				temp=new T[size];
 				memcpy(temp,storage,used*sizeof(T));
@@ -94,6 +95,7 @@ public:
 				size=default_size;
 				temp=new T[size];
 				used=0;
+				status=1;
 			}
 			delete []storage;
 			storage=temp;
@@ -101,6 +103,7 @@ public:
 		memcpy(storage+used,con,amount*sizeof(T));
 		used+=amount;
 		LeaveCriticalSection(&cs_store);
+		return status;
 	}
 	int Find(const T& item, int start=0, DWORD control=0)
 	{

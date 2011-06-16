@@ -37,7 +37,7 @@ const wchar_t* ErrorNoAttach=L"No process attached.";
 const wchar_t* ErrorMonitor=L"Can't monitor process.";
 
 //utility.cpp
-const wchar_t* InitMessage=L"Interactive Text Hooker 2.2 (2011.6.6)\r\n\
+const wchar_t* InitMessage=L"Interactive Text Hooker 2.2 (2011.6.16)\r\n\
 Copyright (C) 2010-2011  kaosu (qiupf2000@gmail.com)\r\n\
 Source code <http://code.google.com/p/interactive-text-hooker/>\r\n\
 General discussion <http://www.hongfire.com/forum/showthread.php?t=208860>\r\n";

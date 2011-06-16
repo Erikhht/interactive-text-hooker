@@ -274,6 +274,32 @@ finish:
 		add esp,ecx
 	}
 }
+/*DWORD SearchPattern_SSE(DWORD base, DWORD base_length, LPVOID search, DWORD search_length)
+{
+
+}
+int str_kmp_c(const char* s1, int cnt1, const char* s2, int cnt2 )
+{
+	int i, j;
+	i = 0; j = 0;
+	while ( i+j < cnt1)
+	{
+		if( s2[i] == s1[i+j]) 
+		{
+			i++;
+			if( i == cnt2) break; // found full match
+		}
+		else
+		{
+			j = j+i - ovrlap_tbl[i]; // update the offset in s1 to start next round of string compare
+			if( i > 0)
+			{
+				i = ovrlap_tbl[i]; // update the offset of s2 for next string compare should start at
+			}
+		}
+	};
+	return j;
+}*/
 DWORD IthGetMemoryRange(LPVOID mem, DWORD* base, DWORD* size)
 {
 	DWORD r;
@@ -442,10 +468,10 @@ void IthInitSystemService()
 	NtMapViewOfSection(thread_man_section,NtCurrentProcess(),
 		(PVOID*)&thread_man,0,0,0,&size,ViewUnmap,0,PAGE_EXECUTE_READWRITE);
 	thread_man_mutex=IthCreateMutex(L"ITH_ThreadMan",0);
-	LARGE_INTEGER time;
+	/*LARGE_INTEGER time;
 	NtQuerySystemTime(&time);
 	time.QuadPart-=GetTimeBias()->QuadPart;
-	RtlTimeToTimeFields(&time,(TIME_FIELDS*)&launch_time);
+	RtlTimeToTimeFields(&time,(TIME_FIELDS*)&launch_time);*/
 }
 void IthCloseSystemService()
 {
@@ -546,6 +572,20 @@ HANDLE IthCreateFile(LPWSTR name, DWORD option, DWORD share, DWORD disposition)
 		option|FILE_READ_ATTRIBUTES|SYNCHRONIZE
 		,&oa,&isb,0,0,share,disposition,
 		FILE_SYNCHRONOUS_IO_NONALERT|FILE_NON_DIRECTORY_FILE,0,0)))
+		return hFile;
+	else return INVALID_HANDLE_VALUE;
+}
+HANDLE IthCreateDirectory(LPWSTR name)
+{
+	wcscpy(current_dir,name);
+	UNICODE_STRING us;
+	RtlInitUnicodeString(&us,file_path);
+	OBJECT_ATTRIBUTES oa={sizeof(oa),0,&us,OBJ_CASE_INSENSITIVE,0,0};
+	HANDLE hFile;
+	IO_STATUS_BLOCK isb;
+	if (NT_SUCCESS(NtCreateFile(&hFile,STANDARD_RIGHTS_REQUIRED,&oa,&isb,0,0,
+		FILE_SHARE_READ|FILE_SHARE_WRITE,
+		FILE_OPEN_IF,FILE_DIRECTORY_FILE,0,0)))
 		return hFile;
 	else return INVALID_HANDLE_VALUE;
 }
@@ -712,7 +752,7 @@ HANDLE IthCreateThread(LPVOID start_addr, DWORD param, HANDLE hProc)
 	HANDLE hThread;
 	CLIENT_ID id;
 	LPVOID protect;
-	USER_STACK stack={0};
+	USER_STACK stack={};
 	CONTEXT ctx={CONTEXT_FULL};
 	DWORD size=DEFAULT_STACK_LIMIT,commit=DEFAULT_STACK_COMMIT,x;
 	NtAllocateVirtualMemory(hProc,&stack.ExpandableStackBottom,
@@ -808,5 +848,8 @@ void IthSleep(int time)
 		add esp,8
 	}
 }
-
+void IthSystemTimeToLocalTime(LARGE_INTEGER* time)
+{
+	time->QuadPart-=GetTimeBias()->QuadPart;
+}
 }

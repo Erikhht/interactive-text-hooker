@@ -188,8 +188,7 @@ void TextHook::Send(DWORD dwDataBase, DWORD dwRetn)
 		{
 			if (IthGetMemoryRange((LPVOID)(dwDataIn+hp.ind),0,0))
 				dwDataIn=*(DWORD*)(dwDataIn+hp.ind);
-			else
-				return;
+			else return;
 		}
 		if (dwType&PRINT_DWORD) 
 		{
@@ -618,5 +617,3 @@ void InitDefaultHook()
 	for (int i=0;i<sizeof(HookNameInitTable)/4;i++)
 		hookman[i].SetHookName(HookNameInitTable[i]);
 }
-
-

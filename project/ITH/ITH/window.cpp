@@ -25,11 +25,17 @@ int import_buffer_len;
 static WNDPROC proc,proccmd;
 static WCHAR last_cmd[CMD_SIZE];
 static CRITICAL_SECTION update_cs;
+
 HWND hMainWnd,hwndCombo,hwndProc,hwndEdit,hwndCmd;
 HWND hwndProcess,hwndThread,hwndHook,hwndProfile;
 HWND hwndOption,hwndTop,hwndClear,hwndSave;
 HWND hProcDlg,hHookDlg,hProfileDlg,hOptionDlg,hThreadDlg,hEditProfileDlg;
-DWORD split_time, process_time, inject_delay, insert_delay;
+HBITMAP hbmp,hBlackBmp;
+BITMAP bmp;
+HBRUSH hblack;
+HDC hCompDC,hBlackDC;
+BLENDFUNCTION fn;
+DWORD split_time, process_time, inject_delay, insert_delay, background;
 HookWindow* hkwnd;
 ProcessWindow* pswnd;
 ThreadWindow* thwnd;
@@ -59,7 +65,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 	wcex.hInstance		= hInstance;
 	wcex.hIcon			= 0;
 	wcex.hCursor		= 0;
-	wcex.hbrBackground	= (HBRUSH)COLOR_BACKGROUND;
+	wcex.hbrBackground	= 0;//(HBRUSH)COLOR_BACKGROUND;
 	wcex.lpszMenuName	= 0;
 	wcex.lpszClassName	= ClassName;
 	wcex.hIconSm		= LoadIcon(hInstance,(LPWSTR)IDI_ICON1);
@@ -127,7 +133,7 @@ BOOL SaveCurrentProfile()
 	for (i=1;i<table->Used();i++)
 	{
 		thread=table->FindThread(i);
-		if (thread->PID()!=pid) continue;
+		if (thread==0||thread->PID()!=pid) continue;
 		if (thread->GetComment()||thread->Link()||(thread->Status()&CURRENT_SELECT))
 			SaveSingleThread(&pf,thread,hooks,pid);
 	}
@@ -976,11 +982,22 @@ LRESULT CALLBACK EditProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				}
 			}
 			return 0;
+	case WM_ERASEBKGND:
+		{
+			RECT rc;
+			HDC hDC=(HDC)wParam;
+			GetClientRect(hwndEdit,&rc);							
+			BitBlt(hDC,0,0,rc.right,rc.bottom,hBlackDC,0,0,SRCCOPY);
+		}
+		
+		return 1;
 	case WM_LBUTTONUP:
 			if (hwndEdit) SendMessage(hwndEdit,WM_COPY,0,0);
-			//return 0;
 	default:
-		return proc(hWnd,message,wParam,lParam);	
+		{
+			return proc(hWnd,message,wParam,lParam);	
+		}
+		
 	}
 	
 }
@@ -1016,39 +1033,43 @@ LRESULT CALLBACK EditCmdProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 	}
 	return CallWindowProc(proccmd,hWnd,message,wParam,lParam);
 }
+void CreateButtons(HWND hWnd)
+{
+	hwndProcess = CreateWindow(L"Button", L"Process", WS_CHILD | WS_VISIBLE,
+		0, 0, 0, 0, hWnd, 0, hIns, NULL);
+	hwndThread = CreateWindow(L"Button", L"Thread", WS_CHILD | WS_VISIBLE,
+		0, 0, 0, 0, hWnd, 0, hIns, NULL);
+	hwndHook = CreateWindow(L"Button", L"Hook", WS_CHILD | WS_VISIBLE,
+		0, 0, 0, 0, hWnd, 0, hIns, NULL);
+	hwndProfile = CreateWindow(L"Button", L"Profile", WS_CHILD | WS_VISIBLE,
+		0, 0, 0, 0, hWnd, 0, hIns, NULL);
+	hwndOption = CreateWindow(L"Button", L"Option", WS_CHILD | WS_VISIBLE,
+		0, 0, 0, 0, hWnd, 0, hIns, NULL);
+	hwndClear = CreateWindow(L"Button", L"Clear", WS_CHILD | WS_VISIBLE,
+		0, 0, 0, 0, hWnd, 0, hIns, NULL);
+	hwndSave = CreateWindow(L"Button", L"Save", WS_CHILD | WS_VISIBLE,
+		0, 0, 0, 0, hWnd, 0, hIns, NULL);
+	hwndTop = CreateWindow(L"Button", L"Top", WS_CHILD | WS_VISIBLE | BS_PUSHLIKE | BS_CHECKBOX,
+		0, 0, 0, 0, hWnd, 0, hIns, NULL);
+
+	hwndProc = CreateWindow(L"ComboBox", NULL,
+		WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | 
+		CBS_SORT | WS_VSCROLL | WS_TABSTOP,
+		0, 0, 0, 0, hWnd, 0, hIns, NULL); 
+	hwndCmd = CreateWindowEx(WS_EX_CLIENTEDGE, L"Edit", NULL,
+		WS_CHILD | WS_VISIBLE | ES_NOHIDESEL| ES_LEFT | ES_AUTOHSCROLL,
+		0, 0, 0, 0, hWnd, 0, hIns, NULL);
+	hwndEdit = CreateWindowEx(WS_EX_CLIENTEDGE, L"Edit", NULL,
+		WS_CHILD | WS_VISIBLE | ES_NOHIDESEL| WS_VSCROLL |
+		ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL, 
+		0, 0, 0, 0, hWnd, 0, hIns, NULL);
+}
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	switch (message) 
 	{ 
 		case WM_CREATE:
-			hwndProcess = CreateWindow(L"Button", L"Process", WS_CHILD | WS_VISIBLE,
-				0, 0, 0, 0, hWnd, 0, hIns, NULL);
-			hwndThread = CreateWindow(L"Button", L"Thread", WS_CHILD | WS_VISIBLE,
-				0, 0, 0, 0, hWnd, 0, hIns, NULL);
-			hwndHook = CreateWindow(L"Button", L"Hook", WS_CHILD | WS_VISIBLE,
-				0, 0, 0, 0, hWnd, 0, hIns, NULL);
-			hwndProfile = CreateWindow(L"Button", L"Profile", WS_CHILD | WS_VISIBLE,
-				0, 0, 0, 0, hWnd, 0, hIns, NULL);
-			hwndOption = CreateWindow(L"Button", L"Option", WS_CHILD | WS_VISIBLE,
-				0, 0, 0, 0, hWnd, 0, hIns, NULL);
-			hwndClear = CreateWindow(L"Button", L"Clear", WS_CHILD | WS_VISIBLE,
-				0, 0, 0, 0, hWnd, 0, hIns, NULL);
-			hwndSave = CreateWindow(L"Button", L"Save", WS_CHILD | WS_VISIBLE,
-				0, 0, 0, 0, hWnd, 0, hIns, NULL);
-			hwndTop = CreateWindow(L"Button", L"Top", WS_CHILD | WS_VISIBLE | BS_PUSHLIKE | BS_CHECKBOX,
-				0, 0, 0, 0, hWnd, 0, hIns, NULL);
-
-			hwndProc = CreateWindow(L"ComboBox", NULL,
-									WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | 
-									CBS_SORT | WS_VSCROLL | WS_TABSTOP,
-									0, 0, 0, 0, hWnd, 0, hIns, NULL); 
-			hwndCmd = CreateWindowEx(WS_EX_CLIENTEDGE, L"Edit", NULL,
-									WS_CHILD | WS_VISIBLE | ES_NOHIDESEL| ES_LEFT | ES_AUTOHSCROLL,
-									0, 0, 0, 0, hWnd, 0, hIns, NULL);
-			hwndEdit = CreateWindowEx(WS_EX_CLIENTEDGE, L"Edit", NULL,
-									WS_CHILD | WS_VISIBLE | ES_NOHIDESEL| WS_VSCROLL |
-									ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL, 
-									0, 0, 0, 0, hWnd, 0, hIns, NULL);
+			CreateButtons(hWnd);
 			// Add text to the window. 
 			SendMessage(hwndEdit, EM_SETLIMITTEXT, -1, 0);
 			SendMessage(hwndEdit, WM_INPUTLANGCHANGEREQUEST, 0, 0x411);
@@ -1061,14 +1082,39 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			{
 				HFONT hf=CreateFont(18,0,0,0,FW_LIGHT,0,0,0,SHIFTJIS_CHARSET,0,0,ANTIALIASED_QUALITY,0,
 					L"MS Gothic");
+				hblack=CreateSolidBrush(RGB(0,0,0));
 				SendMessage(hwndCmd, WM_SETFONT, (WPARAM)hf, 0);
 				SendMessage(hwndEdit, WM_SETFONT, (WPARAM)hf, 0);
 				SendMessage(hwndCombo, WM_SETFONT, (WPARAM)hf, 0);
 				SendMessage(hwndProc, WM_SETFONT, (WPARAM)hf, 0);
+				LPWSTR p=comment_buffer+GetCurrentDirectory(0x200,comment_buffer);
+				if (*p!=L'\\') *p++=L'\\';
+				wcscpy(p,L"Background.bmp");
+				hbmp=(HBITMAP)LoadImage(0,comment_buffer,IMAGE_BITMAP,0,0,LR_LOADFROMFILE);
+				HDC hDC=GetDC(hwndEdit);			
+				hCompDC=CreateCompatibleDC(hDC);
+				hBlackDC=CreateCompatibleDC(hDC);
+				if (hbmp)
+				{
+					GetObject(hbmp,sizeof(bmp),&bmp);
+					SelectObject(hCompDC,hbmp);
+					hBlackBmp=CreateCompatibleBitmap(hDC,bmp.bmWidth,bmp.bmHeight);
+					SelectObject(hBlackDC,hBlackBmp);
+					background=1;
+					RECT rc;
+					rc.left=rc.top=0;
+					rc.right=bmp.bmWidth;
+					rc.bottom=bmp.bmHeight;
+					FillRect(hBlackDC,&rc,hblack);
+					fn.AlphaFormat=AC_SRC_ALPHA;
+					fn.BlendOp=AC_SRC_OVER;
+					fn.SourceConstantAlpha=0x80;
+					GdiAlphaBlend(hBlackDC,0,0,rc.right,rc.bottom,hCompDC,0,0,rc.right,rc.bottom,fn);
+				}
+				ReleaseDC(hwndEdit,hDC);
 
 			}
 			return 0; 
-
 		case WM_COMMAND:
 			{
 				DWORD wmId, wmEvent, dwId;
@@ -1078,6 +1124,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 				switch (wmEvent)
 				{
+				case EN_VSCROLL:
+					{
+						SCROLLBARINFO info={sizeof(info)};
+						GetScrollBarInfo(hwndEdit,OBJID_VSCROLL,&info);
+						InvalidateRect(hwndEdit,0,1);
+						ValidateRect(hwndEdit,&info.rcScrollBar);
+						RedrawWindow(hwndEdit,0,0,RDW_ERASE);
+					}
+					break;
 				case CBN_SELENDOK:
 					{
 						if (h==hwndProc) return 0;
@@ -1193,7 +1248,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			//DeleteCriticalSection(&update_cs);
 			SaveSettings();
 			PostQuitMessage(0);
-			break;
+			return 0;
+		case WM_CTLCOLOREDIT:
+			if (background)
+			if ((HWND)lParam==hwndEdit)
+			{
+				SetTextColor((HDC)wParam,RGB(0xFF,0xFF,0xFF));
+				SetBkMode((HDC)wParam, TRANSPARENT);
+				return 0;
+			}
+
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam); 
 	}
@@ -1979,9 +2043,12 @@ void ThreadWindow::ExportAllThreadText()
 	}
 	ThreadTable* table=man->Table();
 	NtQuerySystemTime(&time);
+	IthSystemTimeToLocalTime(&time);
 	RtlTimeToTimeFields(&time,&tf);
 	*str++=L'\\';
-	p=str+swprintf(str,L"%.4d-%.2d-%.2d-",tf.wYear,tf.wMonth,tf.wDay);
+	tf.wYear=tf.wYear%100;
+
+	p=str+swprintf(str,L"%.2d%.2d%.2d-%.2d%.2d-",tf.wYear,tf.wMonth,tf.wDay,tf.wHour,tf.wMinute);
 	man->LockHookman();
 	for (int i=0;i<=table->Used();i++)
 	{
@@ -2001,7 +2068,13 @@ void ThreadWindow::ExportAllThreadText()
 		it->ExportTextToFile(str_buffer+5);
 	}
 	man->UnlockHookman();
-	MessageBox(0,L"Success",L"Success",0);
+	MessageBox(0,L"Success. Text saved in ITH folder.",L"Success",0);
+	p=str_buffer+5;
+	p1=p;
+	while (*p1&&*p1!=L'\\') p1++;
+	if (*p1==0) return;
+	*p1=0;
+	ShellExecute(0,L"open",p,0,0,SW_SHOWNORMAL);
 }
 void ThreadWindow::ExportSingleThreadText()
 {
@@ -2013,15 +2086,18 @@ void ThreadWindow::ExportSingleThreadText()
 	TextThread* it;
 	ThreadTable* table=man->Table();
 	NtQuerySystemTime(&time);
+	IthSystemTimeToLocalTime(&time);
 	RtlTimeToTimeFields(&time,&tf);
 	index=SendMessage(hcCurrentThread,CB_GETCURSEL,0,0);
 	SendMessage(hcCurrentThread,CB_GETLBTEXT,index,(LPARAM)entry_string);
 	swscanf(entry_string,L"%X",&num);
 	man->LockHookman();
 	it=table->FindThread(num);
+	tf.wYear=tf.wYear%100;
 	if (it)
 	{
-		p1=entry_string+swprintf(entry_string,L"%.4d-%.2d-%.2d-%.4X-",tf.wYear,tf.wMonth,tf.wDay,num);
+		p1=entry_string+swprintf(entry_string,L"%.2d%.2d%.2d-%.2d%.2d-%.4X-",
+			tf.wYear,tf.wMonth,tf.wDay,tf.wHour,tf.wMinute,num);
 		p2=entry_string+0x2B;
 		while (*p2)
 		{
@@ -2038,7 +2114,8 @@ void ThreadWindow::ExportSingleThreadText()
 		it->ExportTextToFile(entry_string);
 	}
 	man->UnlockHookman();
-	MessageBox(0,L"Success",L"Success",0);
+	MessageBox(0,L"Success. Text saved in ITH folder.",L"Success",0);
+	ShellExecute(0,L"open",L"",0,0,SW_SHOWNORMAL);
 }
 
 ProfileWindow::ProfileWindow(HWND hDialog)

@@ -48,6 +48,7 @@ DWORD IthWaitForSingleObject(HANDLE hObject, DWORD dwTime);
 HANDLE IthCreateThread(LPVOID start_addr, DWORD param, HANDLE hProc=(HANDLE)-1);
 DWORD GetExportAddress(DWORD hModule,DWORD hash);
 void IthSleep(int time);
+void IthSystemTimeToLocalTime(LARGE_INTEGER* ptime);
 void FreeThreadStart(HANDLE hProc);
 void CheckThreadStart();
 }

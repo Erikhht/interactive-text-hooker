@@ -231,6 +231,7 @@ int main()
 		DispatchMessage(&msg);
 	}
 	NtClearEvent(hPipeExist);
+	Sleep(100);
 	delete cmdq;
 	delete pfman;
 	delete man;

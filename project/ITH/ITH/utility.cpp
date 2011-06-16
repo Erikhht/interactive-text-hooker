@@ -465,13 +465,12 @@ void HookManager::RemoveSingleThread(DWORD number)
 		if (flag)
 		{
 			current=0;
-			WCHAR str[0x40];
 			if (head.Left)
 				number=head.Left->data;
 			else number=0;
-			swprintf(str,L"%x",number);
-			//MessageBox(0,str,str,0);
+
 			it=table->FindThread(number);
+			if (it==0) __asm int 3
 			it->ResetEditText();
 		}
 	}
@@ -1047,6 +1046,12 @@ void TextThread::RemoveSingleRepeatAuto(BYTE* con,int &len)
 					last=*text;
 					return;
 				}
+				if (repeat_single_current==0)
+				{
+					status|=REPEAT_NUMBER_DECIDED;
+					repeat_single=0;
+					return;
+				}
 				last=*text;
 				RepeatCountNode* it=head;
 				if (repeat_detect_count>MIN_DETECT)
@@ -1096,6 +1101,11 @@ void TextThread::RemoveSingleRepeatAuto(BYTE* con,int &len)
 			} //Check Repeat
 		} //repeat_single decided?
 	} //len
+	else
+	{
+		status|=REPEAT_NUMBER_DECIDED;
+		repeat_single=0;
+	}
 }
 void TextThread::RemoveSingleRepeatForce(BYTE* con,int &len)
 {
@@ -1143,7 +1153,6 @@ void TextThread::RemoveCyclicRepeat(BYTE* &con, int &len)
 				
 				if (status&CURRENT_SELECT)
 					texts->ReplaceSentence(storage+last_sentence+half_length,repeat_index);
-				if (repeat_index<0) __asm int 3;
 				ClearMemory(last_sentence+half_length,repeat_index);
 				used-=repeat_index;
 				repeat_index=0;
@@ -1159,12 +1168,17 @@ void TextThread::RemoveCyclicRepeat(BYTE* &con, int &len)
 	else
 	{
 		if (sentence_length==0) return;
-		if (len<sentence_length)
+		else if (len<=sentence_length)
 		{
 			if (memcmp(storage+last_sentence,con,len)==0)
 			{
 				status|=REPEAT_DETECT;
 				repeat_index=len;
+				if (repeat_index==sentence_length)
+				{
+					repeat_index=0;
+					len=0;
+				}
 			}
 			else if (sentence_length>repeat_detect_limit)
 			{
@@ -1269,14 +1283,15 @@ void TextThread::ResetRepeatStatus()
 	repeat_single_current=0;
 	repeat_single_count=0;
 	repeat_detect_count=0;
-	RepeatCountNode *t=head,*tt;
+	RepeatCountNode *t=head->next,*tt;
 	while (t)
 	{
 		tt=t;
 		t=tt->next;
 		delete tt;
 	}
-	head=0;
+	//head=new RepeatCountNode;
+	head->count=head->repeat=0;
 	status&=~REPEAT_NUMBER_DECIDED;
 }
 void TextThread::AddLineBreak()
@@ -1379,7 +1394,17 @@ void TextThread::AddToStore(BYTE* con,int len, bool new_line,bool console)
 		sentence_length+=len;
 	}
 	
-	MyVector::AddToStore(con,len);
+	if (MyVector::AddToStore(con,len))
+	{
+		ResetRepeatStatus();
+		last_sentence=0;
+		prev_sentence=0;
+		sentence_length=len;
+		repeat_index=0;
+		status&=~REPEAT_DETECT|REPEAT_SUPPRESS;
+		
+
+	}
 	if (status&CURRENT_SELECT) texts->AddText((BYTE*)con,len);
 }
 void TextThread::ResetEditText()

@@ -334,18 +334,19 @@ void FindKiriKiriHook(DWORD fun, DWORD size, DWORD pt, DWORD flag)
 									if (k+5+*(DWORD*)(pt+k+1)==j) t++;
 									if (t==2)
 									{
-										for (k+=pt+0x14; *(WORD*)(k)!=0xC483;k++);
+										//for (k+=pt+0x14; *(WORD*)(k)!=0xC483;k++);
 										//swprintf(str,L"Hook addr: 0x%.8X",pt+k);
 										//OutputConsole(str);
-										HookParam hp={0};
-										hp.addr=k;
+										HookParam hp={};
+										/*hp.addr=k;
 										hp.extern_fun=(DWORD)SpecialHookKiriKiri;
-										hp.type=NO_CONTEXT|EXTERN_HOOK|USING_UNICODE|USING_SPLIT;
-										/*hp.off=-0x14;
+										hp.type=NO_CONTEXT|EXTERN_HOOK|USING_UNICODE|USING_SPLIT;*/
+										hp.addr=pt+k+0x14;
+										hp.off=-0x14;
 										hp.ind=-0x2;
 										hp.split=-0xC;
 										hp.length_offset=1;
-										hp.type|=USING_UNICODE|NO_CONTEXT|USING_SPLIT|DATA_INDIRECT;*/
+										hp.type|=USING_UNICODE|NO_CONTEXT|USING_SPLIT|DATA_INDIRECT;
 										NewHook(hp,L"KiriKiri2");
 										return;
 									}
