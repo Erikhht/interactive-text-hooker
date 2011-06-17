@@ -92,9 +92,10 @@ public:
 	void RemoveSingleHook(DWORD pid, DWORD addr);
 	void RemoveSingleThread(DWORD number);
 	void RegisterThread(TextThread*, DWORD);
-	void RegisterPipe(HANDLE text, HANDLE cmd);
+	void RegisterPipe(HANDLE text, HANDLE cmd, HANDLE thread);
 	void RegisterProcess(DWORD pid, DWORD hookman, DWORD module, DWORD engine);
 	void UnRegisterProcess(DWORD pid);
+	void WaitForAllRecvThreads();
 	void SetName(DWORD);
 	void SetProcessEngineType(DWORD pid, DWORD type);
 	bool GetProcessPath(DWORD pid, LPWSTR path);
@@ -118,11 +119,11 @@ private:
 	CRITICAL_SECTION hmcs; //0x18
 	TextThread *current;
 	ThreadTable *table;
-
+	HANDLE destroy_event;
 	ProcessRecord record[MAX_REGISTER+1];
 	HANDLE text_pipes[MAX_REGISTER+1];
 	HANDLE cmd_pipes[MAX_REGISTER+1];
-
+	HANDLE recv_threads[MAX_REGISTER+1];
 	WORD register_count, new_thread_number; 
 };
 

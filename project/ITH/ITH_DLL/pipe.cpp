@@ -194,7 +194,12 @@ DWORD WINAPI CommandPipe(LPVOID lpThreadParameter)
 			NtDelayExecution(0,&sleep_time);
 		}
 		status=NtReadFile(hCommand,0,0,0,&ios,buff,0x200,0,0);
-
+		if (status==STATUS_PIPE_BROKEN||
+			status==STATUS_PIPE_DISCONNECTED)
+		{
+			NtClearEvent(hPipeExist);
+			continue;
+		}
 		if (status==STATUS_PENDING)
 		{
 			NtWaitForSingleObject(hCommand,0,0);

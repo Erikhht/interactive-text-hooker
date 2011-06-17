@@ -41,6 +41,8 @@ const wchar_t* InitMessage=L"Interactive Text Hooker 2.2 (2011.6.16)\r\n\
 Copyright (C) 2010-2011  kaosu (qiupf2000@gmail.com)\r\n\
 Source code <http://code.google.com/p/interactive-text-hooker/>\r\n\
 General discussion <http://www.hongfire.com/forum/showthread.php?t=208860>\r\n";
+const wchar_t* BackgroundMsg=L"If you feel tired about the pure white background,\r\n\
+put your favorite picture in ITH folder and name it 'background.bmp'\r\n";
 const wchar_t* ErrorLinkExist=L"Link exist.";
 const wchar_t* ErrorCylicLink=L"Link failed. No cyclic link allowed.";
 const wchar_t* FormatLink=L"Link from thread%.4x to thread%.4x.";

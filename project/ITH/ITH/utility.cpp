@@ -23,7 +23,7 @@ WCHAR user_entry[0x40];
 static BYTE null_buffer[4]={0,0,0,0};
 static BYTE static_small_buffer[0x100];
 extern BYTE* static_large_buffer;
-extern DWORD repeat_count;
+extern DWORD repeat_count,background;
 LPWSTR HookNameInitTable[]={
 	L"ConsoleOutput",
 	L"GetTextExtentPoint32A",
@@ -353,12 +353,14 @@ HookManager::HookManager()
 	entry->AddToCombo();
 	entry->ComboSelectCurrent();
 	entry->AddToStore((BYTE*)InitMessage,wcslen(InitMessage)<<1,0,1);
+	if (background==0) entry->AddToStore((BYTE*)BackgroundMsg,wcslen(BackgroundMsg)<<1,0,1);
+
 	InitializeCriticalSection(&hmcs);
+	destroy_event=IthCreateEvent(0,0,0);
 }
 HookManager::~HookManager()
 {
-	while (record[0].pid_register)
-		UnRegisterProcess(record[0].pid_register);
+	NtWaitForSingleObject(destroy_event,0,0);
 	delete table;
 	delete head.key;
 	DeleteCriticalSection(&hmcs);
@@ -470,7 +472,6 @@ void HookManager::RemoveSingleThread(DWORD number)
 			else number=0;
 
 			it=table->FindThread(number);
-			if (it==0) __asm int 3
 			it->ResetEditText();
 		}
 	}
@@ -523,14 +524,18 @@ void HookManager::RegisterThread(TextThread* it, DWORD num)
 {
 	table->SetThread(num,it);
 }
-void HookManager::RegisterPipe(HANDLE text, HANDLE cmd)
+void HookManager::RegisterPipe(HANDLE text, HANDLE cmd, HANDLE thread)
 {
 	text_pipes[register_count]=text;
-	cmd_pipes[register_count++]=cmd;
+	cmd_pipes[register_count]=cmd;
+	recv_threads[register_count]=thread;
+	register_count++;
+	if (register_count==1) NtSetEvent(destroy_event,0);
+	else NtClearEvent(destroy_event);
 }
 void HookManager::RegisterProcess(DWORD pid, DWORD hookman, DWORD module, DWORD engine)
 {
-	WCHAR str[0x40],path[MAX_PATH];
+	WCHAR str[0x40],path[MAX_PATH];	
 	pid_map->Set(pid>>2);
 	record[register_count-1].pid_register=pid;
 	record[register_count-1].hookman_register=hookman;
@@ -562,7 +567,7 @@ void HookManager::RegisterProcess(DWORD pid, DWORD hookman, DWORD module, DWORD 
 		man->AddConsoleOutput(ErrorOpenProcess);
 		return;
 	}
-	
+
 	swprintf(str,L"ITH_HOOKMAN_%d",pid);
 	record[register_count-1].hookman_mutex=IthOpenMutex(str);
 	if (GetProcessPath(pid,path)==false) path[0]=0;
@@ -590,6 +595,7 @@ void HookManager::UnRegisterProcess(DWORD pid)
 	//FreeThreadStart(record[i].process_handle);
 	NtClose(text_pipes[i]);
 	NtClose(cmd_pipes[i]);
+	NtClose(recv_threads[i]);
 	NtClose(record[i].hookman_mutex);
 	NtClose(record[i].process_handle);
 	NtClose(record[i].hookman_section);
@@ -601,6 +607,7 @@ void HookManager::UnRegisterProcess(DWORD pid)
 			record[i]=record[i+1];
 			text_pipes[i]=text_pipes[i+1];
 			cmd_pipes[i]=cmd_pipes[i+1];
+			recv_threads[i]=recv_threads[i+1];
 			if (text_pipes[i]==0) break;
 		}
 		register_count--;
@@ -609,6 +616,7 @@ void HookManager::UnRegisterProcess(DWORD pid)
 	}
 	pid_map->Clear(pid>>2);
 _unregistered:
+	if (register_count==1) NtSetEvent(destroy_event,0);
 	LeaveCriticalSection(&hmcs);
 }
 void HookManager::SetName(DWORD type)

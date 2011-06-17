@@ -57,7 +57,7 @@ void CreateNewPipe()
 {
 	DWORD acl[7]={0x1C0002,1,0x140000,GENERIC_READ|GENERIC_WRITE|SYNCHRONIZE,0x101,0x1000000,0};
 	SECURITY_DESCRIPTOR sd={1,0,4,0,0,0,(PACL)acl};
-	HANDLE hTextPipe,hCmdPipe;
+	HANDLE hTextPipe,hCmdPipe,hThread;
 	IO_STATUS_BLOCK ios;
 	UNICODE_STRING us;
 	RtlInitUnicodeString(&us,pipe);
@@ -70,8 +70,8 @@ void CreateNewPipe()
 	if (!NT_SUCCESS(NtCreateNamedPipeFile(&hCmdPipe,GENERIC_WRITE|SYNCHRONIZE,&oa,&ios,
 		FILE_SHARE_READ,FILE_OPEN_IF,FILE_SYNCHRONOUS_IO_NONALERT,1,1,0,-1,0x1000,0x1000,&time)))
 	{ConsoleOutput(ErrorCreatePipe);return;}
-	man->RegisterPipe(hTextPipe,hCmdPipe);
-	NtClose(IthCreateThread(RecvThread,(DWORD)hTextPipe));
+	hThread=IthCreateThread(RecvThread,(DWORD)hTextPipe);
+	man->RegisterPipe(hTextPipe,hCmdPipe,hThread);
 }
 
 void DetachFromProcess(DWORD pid)

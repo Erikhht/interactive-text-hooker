@@ -39,6 +39,7 @@ extern const wchar_t* ErrorMonitor;
 
 //utility.cpp
 extern const wchar_t* InitMessage;
+extern const wchar_t* BackgroundMsg;
 extern const wchar_t* ErrorLinkExist;
 extern const wchar_t* ErrorCylicLink;
 extern const wchar_t* FormatLink;

@@ -983,14 +983,16 @@ LRESULT CALLBACK EditProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			}
 			return 0;
 	case WM_ERASEBKGND:
+		if (background)
 		{
 			RECT rc;
 			HDC hDC=(HDC)wParam;
 			GetClientRect(hwndEdit,&rc);							
 			BitBlt(hDC,0,0,rc.right,rc.bottom,hBlackDC,0,0,SRCCOPY);
+			return 1;
 		}
+		else return proc(hWnd,message,wParam,lParam);
 		
-		return 1;
 	case WM_LBUTTONUP:
 			if (hwndEdit) SendMessage(hwndEdit,WM_COPY,0,0);
 	default:
@@ -1064,6 +1066,73 @@ void CreateButtons(HWND hWnd)
 		ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL, 
 		0, 0, 0, 0, hWnd, 0, hIns, NULL);
 }
+void LoadBMP(HWND hWnd)
+{
+	LPWSTR p=comment_buffer+GetCurrentDirectory(0x200,comment_buffer);
+	if (*p!=L'\\') *p++=L'\\';
+	wcscpy(p,L"Background.bmp");
+	HANDLE hFile=IthCreateFile(L"background.bmp",FILE_READ_DATA,FILE_SHARE_READ,FILE_OPEN);
+	HDC hDC=GetDC(hwndEdit);	
+	if (INVALID_HANDLE_VALUE!=hFile)
+	{
+		IO_STATUS_BLOCK ios;
+		BITMAPFILEHEADER header;
+		BITMAPINFOHEADER info;
+		LARGE_INTEGER size;
+		LPVOID buffer1,buffer2;
+		NtReadFile(hFile,0,0,0,&ios,&header,sizeof(header),0,0);
+		if (header.bfType!=0x4D42) //BM
+			MessageBox(0,L"Not valid bmp file.",0,0);
+		else
+		{
+			size.LowPart=sizeof(header);
+			size.HighPart=0;
+			NtReadFile(hFile,0,0,0,&ios,&info,sizeof(info),0,0);									
+			hCompDC=CreateCompatibleDC(hDC);
+			hBlackDC=CreateCompatibleDC(hDC);				
+			hBlackBmp=CreateDIBSection(hBlackDC,(BITMAPINFO*)&info,DIB_RGB_COLORS,&buffer2,0,0);				
+			size.LowPart=header.bfOffBits;
+			if (info.biBitCount==24)
+			{
+				info.biBitCount=32;
+				hbmp=CreateDIBSection(hCompDC,(BITMAPINFO*)&info,DIB_RGB_COLORS,&buffer1,0,0);
+				NtReadFile(hFile,0,0,0,&ios,buffer2,info.biWidth*info.biHeight*3,&size,0);
+				BYTE* ptr1=(BYTE*)buffer1;
+				BYTE* ptr2=(BYTE*)buffer2;
+				LONG i,j;
+				for (i=0;i<info.biHeight;i++)
+					for (j=0;j<info.biWidth;j++)
+					{
+						ptr1[0]=ptr2[0];
+						ptr1[1]=ptr2[1];
+						ptr1[2]=ptr2[2];
+						ptr1[3]=0xFF;
+						ptr1+=4;
+						ptr2+=3;
+					}
+					memset(buffer2,0,info.biWidth*info.biHeight*3);
+			}
+			else 
+			{
+				hbmp=CreateDIBSection(hCompDC,(BITMAPINFO*)&info,DIB_RGB_COLORS,&buffer1,0,0);
+				NtReadFile(hFile,0,0,0,&ios,buffer1,info.biWidth*info.biHeight*info.biBitCount/8,&size,0);
+			}
+			NtClose(hFile);
+			GetObject(hbmp,sizeof(bmp),&bmp);
+			SelectObject(hCompDC,hbmp);		
+			SelectObject(hBlackDC,hBlackBmp);
+
+			fn.AlphaFormat=AC_SRC_ALPHA;
+			fn.BlendOp=AC_SRC_OVER;
+			fn.SourceConstantAlpha=0x80;
+			GdiAlphaBlend(hBlackDC,0,0,info.biWidth,info.biHeight,hCompDC,0,0,info.biWidth,info.biHeight,fn);
+			background=1;
+			DeleteDC(hCompDC);
+			DeleteObject(hbmp);
+		}
+	}
+	ReleaseDC(hwndEdit,hDC);
+}
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	switch (message) 
@@ -1087,32 +1156,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				SendMessage(hwndEdit, WM_SETFONT, (WPARAM)hf, 0);
 				SendMessage(hwndCombo, WM_SETFONT, (WPARAM)hf, 0);
 				SendMessage(hwndProc, WM_SETFONT, (WPARAM)hf, 0);
-				LPWSTR p=comment_buffer+GetCurrentDirectory(0x200,comment_buffer);
-				if (*p!=L'\\') *p++=L'\\';
-				wcscpy(p,L"Background.bmp");
-				hbmp=(HBITMAP)LoadImage(0,comment_buffer,IMAGE_BITMAP,0,0,LR_LOADFROMFILE);
-				HDC hDC=GetDC(hwndEdit);			
-				hCompDC=CreateCompatibleDC(hDC);
-				hBlackDC=CreateCompatibleDC(hDC);
-				if (hbmp)
-				{
-					GetObject(hbmp,sizeof(bmp),&bmp);
-					SelectObject(hCompDC,hbmp);
-					hBlackBmp=CreateCompatibleBitmap(hDC,bmp.bmWidth,bmp.bmHeight);
-					SelectObject(hBlackDC,hBlackBmp);
-					background=1;
-					RECT rc;
-					rc.left=rc.top=0;
-					rc.right=bmp.bmWidth;
-					rc.bottom=bmp.bmHeight;
-					FillRect(hBlackDC,&rc,hblack);
-					fn.AlphaFormat=AC_SRC_ALPHA;
-					fn.BlendOp=AC_SRC_OVER;
-					fn.SourceConstantAlpha=0x80;
-					GdiAlphaBlend(hBlackDC,0,0,rc.right,rc.bottom,hCompDC,0,0,rc.right,rc.bottom,fn);
-				}
-				ReleaseDC(hwndEdit,hDC);
-
+				LoadBMP(hWnd);
 			}
 			return 0; 
 		case WM_COMMAND:
