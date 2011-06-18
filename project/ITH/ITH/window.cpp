@@ -32,7 +32,7 @@ HWND hwndOption,hwndTop,hwndClear,hwndSave;
 HWND hProcDlg,hHookDlg,hProfileDlg,hOptionDlg,hThreadDlg,hEditProfileDlg;
 HBITMAP hbmp,hBlackBmp;
 BITMAP bmp;
-HBRUSH hblack;
+HBRUSH hWhiteBrush;
 HDC hCompDC,hBlackDC;
 BLENDFUNCTION fn;
 DWORD split_time, process_time, inject_delay, insert_delay, background;
@@ -58,7 +58,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 {
 	WNDCLASSEX wcex;
 	wcex.cbSize = sizeof(WNDCLASSEX);
-	wcex.style			= CS_HREDRAW | CS_VREDRAW;
+	wcex.style			= 0;//CS_HREDRAW | CS_VREDRAW;
 	wcex.lpfnWndProc	= WndProc;
 	wcex.cbClsExtra		= 0;
 	wcex.cbWndExtra		= 0;
@@ -74,7 +74,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 BOOL InitInstance(HINSTANCE hInstance, int nAdmin, RECT* rc)
 {
 	LPCWSTR name= (nAdmin) ? ClassNameAdmin : ClassName;
-	hMainWnd = CreateWindow(ClassName, name, WS_OVERLAPPEDWINDOW,
+	hMainWnd = CreateWindow(ClassName, name, WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN,
 		rc->left, rc->top, rc->right-rc->left, rc->bottom-rc->top, 0, 0, hInstance, 0);
 	if (!hMainWnd) return FALSE;
 	ShowWindow(hMainWnd, SW_SHOW);
@@ -985,13 +985,29 @@ LRESULT CALLBACK EditProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_ERASEBKGND:
 		if (background)
 		{
-			RECT rc;
+			RECT rc,rc2;
 			HDC hDC=(HDC)wParam;
-			GetClientRect(hwndEdit,&rc);							
-			BitBlt(hDC,0,0,rc.right,rc.bottom,hBlackDC,0,0,SRCCOPY);
-			return 1;
+			GetClientRect(hwndEdit,&rc);
+			rc2=rc;
+			rc2.right=rc2.right<bmp.bmWidth?rc2.right:bmp.bmWidth;
+			rc2.bottom=rc2.bottom<bmp.bmHeight?rc2.bottom:bmp.bmHeight;
+			//StretchBlt(hDC,0,0,rc.right,rc.bottom,hBlackDC,0,0,bmp.bmWidth,bmp.bmHeight,SRCCOPY);
+			BitBlt(hDC,0,0,rc2.right,rc2.bottom,hBlackDC,0,0,SRCCOPY);
+			if (rc2.right-rc.right<0)
+			{
+				rc.left=rc2.right;
+				FillRect(hDC,&rc,hWhiteBrush);
+				rc.left=0;
+			}
+			if (rc2.bottom-rc.bottom<0)
+			{
+				rc.top=rc2.bottom;
+				FillRect(hDC,&rc,hWhiteBrush);
+			}
+			
 		}
-		else return proc(hWnd,message,wParam,lParam);
+		return 1;
+		//else return proc(hWnd,message,wParam,lParam);
 		
 	case WM_LBUTTONUP:
 			if (hwndEdit) SendMessage(hwndEdit,WM_COPY,0,0);
@@ -1068,9 +1084,6 @@ void CreateButtons(HWND hWnd)
 }
 void LoadBMP(HWND hWnd)
 {
-	LPWSTR p=comment_buffer+GetCurrentDirectory(0x200,comment_buffer);
-	if (*p!=L'\\') *p++=L'\\';
-	wcscpy(p,L"Background.bmp");
 	HANDLE hFile=IthCreateFile(L"background.bmp",FILE_READ_DATA,FILE_SHARE_READ,FILE_OPEN);
 	HDC hDC=GetDC(hwndEdit);	
 	if (INVALID_HANDLE_VALUE!=hFile)
@@ -1090,11 +1103,13 @@ void LoadBMP(HWND hWnd)
 			NtReadFile(hFile,0,0,0,&ios,&info,sizeof(info),0,0);									
 			hCompDC=CreateCompatibleDC(hDC);
 			hBlackDC=CreateCompatibleDC(hDC);				
-			hBlackBmp=CreateDIBSection(hBlackDC,(BITMAPINFO*)&info,DIB_RGB_COLORS,&buffer2,0,0);				
+					
 			size.LowPart=header.bfOffBits;
+
 			if (info.biBitCount==24)
 			{
 				info.biBitCount=32;
+				hBlackBmp=CreateDIBSection(hBlackDC,(BITMAPINFO*)&info,DIB_RGB_COLORS,&buffer2,0,0);		
 				hbmp=CreateDIBSection(hCompDC,(BITMAPINFO*)&info,DIB_RGB_COLORS,&buffer1,0,0);
 				NtReadFile(hFile,0,0,0,&ios,buffer2,info.biWidth*info.biHeight*3,&size,0);
 				BYTE* ptr1=(BYTE*)buffer1;
@@ -1114,9 +1129,11 @@ void LoadBMP(HWND hWnd)
 			}
 			else 
 			{
+				hBlackBmp=CreateDIBSection(hBlackDC,(BITMAPINFO*)&info,DIB_RGB_COLORS,&buffer2,0,0);		
 				hbmp=CreateDIBSection(hCompDC,(BITMAPINFO*)&info,DIB_RGB_COLORS,&buffer1,0,0);
 				NtReadFile(hFile,0,0,0,&ios,buffer1,info.biWidth*info.biHeight*info.biBitCount/8,&size,0);
 			}
+			
 			NtClose(hFile);
 			GetObject(hbmp,sizeof(bmp),&bmp);
 			SelectObject(hCompDC,hbmp);		
@@ -1151,7 +1168,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			{
 				HFONT hf=CreateFont(18,0,0,0,FW_LIGHT,0,0,0,SHIFTJIS_CHARSET,0,0,ANTIALIASED_QUALITY,0,
 					L"MS Gothic");
-				hblack=CreateSolidBrush(RGB(0,0,0));
+				hWhiteBrush=CreateSolidBrush(RGB(0xFF,0xFF,0xFF));
 				SendMessage(hwndCmd, WM_SETFONT, (WPARAM)hf, 0);
 				SendMessage(hwndEdit, WM_SETFONT, (WPARAM)hf, 0);
 				SendMessage(hwndCombo, WM_SETFONT, (WPARAM)hf, 0);
@@ -1284,9 +1301,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				MoveWindow(hwndCmd, l, h, LOWORD(lParam)-l, h, 1);
 				MoveWindow(hwndCombo, 0, h*2, LOWORD(lParam), 200, 1);
 				h*=3;
-				MoveWindow(hwndEdit, 0, h, LOWORD(lParam), HIWORD(lParam) - h, 1);
+				MoveWindow(hwndEdit, 0, h, LOWORD(lParam), HIWORD(lParam) - h, 0);
 			}
 			return 0; 
+		case WM_ERASEBKGND:
+			return 1;
 		case WM_DESTROY:
 			running=false;
 			//DeleteCriticalSection(&update_cs);

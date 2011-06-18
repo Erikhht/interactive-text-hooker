@@ -498,7 +498,7 @@ void HookManager::RemoveProcessContext(DWORD pid)
 			}
 		}
 	}
-	for (int i=0;i<=table->Used();i++)
+	for (int i=0;i<table->Used();i++)
 	{
 		it=table->FindThread(i);
 		if (it==0) continue;
@@ -517,7 +517,8 @@ void HookManager::RemoveProcessContext(DWORD pid)
 			ln=head.Left->data;
 		else ln=0;
 		it=table->FindThread(ln);
-		it->ResetEditText();
+		if (it) it->ResetEditText();
+		else __asm int 3
 	}
 }
 void HookManager::RegisterThread(TextThread* it, DWORD num)
@@ -593,15 +594,16 @@ void HookManager::UnRegisterProcess(DWORD pid)
 	else goto _unregistered;
 	for (i=0;i<MAX_REGISTER;i++) if(record[i].pid_register==pid) break;
 	//FreeThreadStart(record[i].process_handle);
-	NtClose(text_pipes[i]);
-	NtClose(cmd_pipes[i]);
-	NtClose(recv_threads[i]);
-	NtClose(record[i].hookman_mutex);
-	NtClose(record[i].process_handle);
-	NtClose(record[i].hookman_section);
-	NtUnmapViewOfSection(NtCurrentProcess(),record[i].hookman_map);
+
 	if (i<MAX_REGISTER)
 	{
+		NtClose(text_pipes[i]);
+		NtClose(cmd_pipes[i]);
+		NtClose(recv_threads[i]);
+		NtClose(record[i].hookman_mutex);
+		NtClose(record[i].process_handle);
+		NtClose(record[i].hookman_section);
+		NtUnmapViewOfSection(NtCurrentProcess(),record[i].hookman_map);
 		for (;i<MAX_REGISTER;i++)
 		{
 			record[i]=record[i+1];
@@ -1176,7 +1178,7 @@ void TextThread::RemoveCyclicRepeat(BYTE* &con, int &len)
 	else
 	{
 		if (sentence_length==0) return;
-		else if (len<=sentence_length)
+		else if (len<=(int)sentence_length)
 		{
 			if (memcmp(storage+last_sentence,con,len)==0)
 			{

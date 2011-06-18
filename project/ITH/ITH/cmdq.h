@@ -47,7 +47,7 @@ private:
 	CRITICAL_SECTION rw;
 	DWORD current;
 	DWORD used;
-	SendParam queue[QUEUE_MAX];
 	HANDLE hSemaphore,hThread;
+	SendParam queue[QUEUE_MAX];
 	DWORD pid_associate[QUEUE_MAX];
 };

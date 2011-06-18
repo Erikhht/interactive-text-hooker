@@ -188,7 +188,8 @@ DWORD GetModuleBase()
 LONG WINAPI ExceptionFilter(EXCEPTION_POINTERS *ExceptionInfo)
 {
 	WCHAR str[0x40],name[0x100];
-	swprintf(str,L"Exception code: 0x%.8X", ExceptionInfo->ExceptionRecord->ExceptionCode);
+	swprintf(str,L"Exception code: 0x%.8X\r\nAddress: 0x%.8X", ExceptionInfo->ExceptionRecord->ExceptionCode, 
+		ExceptionInfo->ContextRecord->Eip);
 	MessageBox(0,str,0,0);
 	MEMORY_BASIC_INFORMATION info;
 	if (NT_SUCCESS(NtQueryVirtualMemory(NtCurrentProcess(),(PVOID)ExceptionInfo->ContextRecord->Eip,
@@ -203,7 +204,7 @@ LONG WINAPI ExceptionFilter(EXCEPTION_POINTERS *ExceptionInfo)
 			MessageBox(0,str,0,0);
 		}
 	}
-	NtTerminateProcess(NtCurrentProcess(),0);
+	//NtTerminateProcess(NtCurrentProcess(),0);
 	return 0;
 }
 int main()
@@ -223,7 +224,6 @@ int main()
 	pfman=new ProfileManager;
 	cmdq=new CommandQueue;
 	CreateNewPipe();
-	NtClose(IthCreateThread(CmdThread,0));
 	if (!admin) ConsoleOutput(NotAdmin);
 	while (GetMessage(&msg, NULL, 0, 0))
 	{
@@ -239,5 +239,6 @@ int main()
 	if (static_large_buffer!=0) delete static_large_buffer;
 _exit:
 	IthCloseSystemService();
+	//ExitProcess(0);
 	NtTerminateProcess(NtCurrentProcess(),0);
 }

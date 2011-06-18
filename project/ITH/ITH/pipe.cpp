@@ -176,15 +176,18 @@ DWORD WINAPI RecvThread(LPVOID lpThreadParameter)
 	NtClearEvent(hDetachEvent);
 	LeaveCriticalSection(&detach_cs);
 	swprintf((LPWSTR)buff,FormatDetach,pid);
-	ConsoleOutput((LPWSTR)buff);
-	NtClose(IthCreateThread(UpdateWindows,0));
+	if (running)
+	{
+		ConsoleOutput((LPWSTR)buff);
+		NtClose(IthCreateThread(UpdateWindows,0));
+	}
 	delete buff;
 	return 0;
 }
 DWORD WINAPI CmdThread(LPVOID lpThreadParameter)
 {
-
-	while (running) cmdq->SendCommand();
+	CommandQueue* q=(CommandQueue*)lpThreadParameter;
+	while (running) q->SendCommand();
 	return 0;
 }
 
@@ -192,10 +195,14 @@ CommandQueue::CommandQueue():used(0),current(1)
 {
 	InitializeCriticalSection(&rw);
 	NtCreateSemaphore(&hSemaphore,SEMAPHORE_ALL_ACCESS,0,0,QUEUE_MAX);
+	hThread=IthCreateThread(CmdThread,(DWORD)this);
 }
 CommandQueue::~CommandQueue()
 {
+	NtReleaseSemaphore(hSemaphore,1,0);	
+	NtWaitForSingleObject(hThread,0,0);
 	NtClose(hSemaphore);
+	NtClose(hThread);
 	DeleteCriticalSection(&rw);
 }
 void CommandQueue::AddRequest(const SendParam& sp, DWORD pid)
