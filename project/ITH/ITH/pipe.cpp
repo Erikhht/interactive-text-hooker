@@ -163,7 +163,7 @@ DWORD WINAPI RecvThread(LPVOID lpThreadParameter)
 			}
 		}
 		else
-			man->AddText(p, it,hook,retn,split,RecvLen);
+			man->DispatchText(p, it,hook,retn,split,RecvLen);
 	}
 	EnterCriticalSection(&detach_cs);
 	hDisconnect=IthCreateEvent(0);

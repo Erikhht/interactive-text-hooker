@@ -55,7 +55,7 @@ public:
 class TCmp
 {
 public:
-	int operator()(const ThreadParameter* t1,const ThreadParameter* t2);
+	char operator()(const ThreadParameter* t1,const ThreadParameter* t2);
 };
 class TCpy
 {
@@ -78,7 +78,7 @@ public:
 	TextThread* GetCurrentThread();
 	void SetCurrent(TextThread* it);
 	void SelectCurrent(LPWSTR str);
-	void AddText(DWORD pid, BYTE* text, DWORD hook, DWORD retn, DWORD split, int len);
+	void DispatchText(DWORD pid, BYTE* text, DWORD hook, DWORD retn, DWORD split, int len);
 	void AddConsoleOutput(LPCWSTR text);
 	void AddLink(WORD from, WORD to);
 	void ClearText(DWORD pid, DWORD hook, DWORD retn, DWORD split);
@@ -102,7 +102,7 @@ public:
 	bool GetProcessName(DWORD pid, LPWSTR str);
 	LPVOID RemoteHook(DWORD pid);
 	ProcessRecord* Records() {return record;}
-	ThreadTable* Table() {return table;}
+	ThreadTable* Table() {return thread_table;}
 	DWORD GetCurrentPID();
 	DWORD GetPIDByHandle(HANDLE h);
 	DWORD GetHookManByPID(DWORD pid);
@@ -118,7 +118,7 @@ private:
 	//IthCriticalSection hmcs;
 	CRITICAL_SECTION hmcs; //0x18
 	TextThread *current;
-	ThreadTable *table;
+	ThreadTable *thread_table;
 	HANDLE destroy_event;
 	ProcessRecord record[MAX_REGISTER+1];
 	HANDLE text_pipes[MAX_REGISTER+1];

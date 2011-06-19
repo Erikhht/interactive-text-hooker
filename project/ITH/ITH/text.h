@@ -48,6 +48,10 @@ struct ThreadParameter
 	DWORD hook;
 	DWORD retn;
 	DWORD spl;
+	/*DWORD spl;
+	DWORD retn;
+	DWORD hook;
+	DWORD pid;*/
 };
 #define COUNT_PER_FOWARD 0x200
 #define REPEAT_DETECT 0x10000

@@ -16,12 +16,13 @@
  */
 #include "hookman.h"
 #include "profile.h"
-#include <xmmintrin.h>
+#include <emmintrin.h>
 #define MAX_ENTRY 0x40
 //#include <richedit.h>
 WCHAR user_entry[0x40];
 static BYTE null_buffer[4]={0,0,0,0};
 static BYTE static_small_buffer[0x100];
+static DWORD zeros[4]={0,0,0,0};
 extern BYTE* static_large_buffer;
 extern DWORD repeat_count,background;
 LPWSTR HookNameInitTable[]={
@@ -275,7 +276,7 @@ TextThread* ThreadTable::FindThread(DWORD number)
 	else return 0;
 }
 
-static const char table[0x100]={
+/*static const char sse_table_neq[0x100]={
 	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, //0, equal
 	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //1, compare 1
 	1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, //2, compare 2
@@ -292,42 +293,64 @@ static const char table[0x100]={
 	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //d, compare 1
 	1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, //e, compare 2
 	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1  //f, compare 1
+};*/
+static const char sse_table_eq[0x100]={
+	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //0, compare 1
+	1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, //1, compare 2
+	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //2, compare 1
+	1,1,1,1, -1,-1,-1,-1, 1,1,1,1, -1,-1,-1,-1, //3, compare 3
+	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //4, compare 1
+	1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, //5, compare 2
+	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //6, compare 1
+	1,1,1,1, 1,1,1,1, -1,-1,-1,-1, -1,-1,-1,-1, //7, compare 4
+	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //8, compare 1
+	1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, //9, compare 2
+	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //a, compare 1
+	1,1,1,1, -1,-1,-1,-1, 1,1,1,1, -1,-1,-1,-1, //b, compare 3
+	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //c, compare 1
+	1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, //d, compare 2
+	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //e, compare 1
+	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0 //f, equal
 };
-int TCmp::operator()(const ThreadParameter* t1, const ThreadParameter* t2)
+char TCmp::operator()(const ThreadParameter* t1, const ThreadParameter* t2)
 	//SSE speed up. Compare 4 integer in const time without branching.
 {
-	__m128 d0,d1,d2;
-	int m0,m1;
+	union
+	{
+		__m128 m0;
+		__m128i i0;
+		__m128d d0;
+	};
+	union
+	{
+		__m128 m1;
+		__m128i i1;
+		__m128d d1;
+	};
+	union
+	{
+		__m128 m2;
+		__m128i i2;
+		__m128d d2;
+	};
+	int k0,k1;
+	/*zero = _mm_loadu_ps((const float*)zeros);
 	d0 = _mm_loadu_ps((const float*)t1);
 	d1 = _mm_loadu_ps((const float*)t2);
-	d2 = _mm_cmpneq_ps(d0,d1);
+	d2 = _mm_xor_ps(d0, d1);
+	d2 = _mm_cmpneq_ps(d2,zero);
 	d0 = _mm_cmplt_ps(d0,d1);	
 	m0 = _mm_movemask_ps(d0);
 	m1 = _mm_movemask_ps(d2);
-	return table[m1*16+m0];
+	return table[m1*16+m0];*/
+	d1 = _mm_loadu_pd((const double*)t1);
+	d2 = _mm_loadu_pd((const double*)t2);
+	i0 = _mm_sub_epi32(i1,i2);
+	k0 = _mm_movemask_ps(m0);
+	i1 = _mm_cmpeq_epi32(i1,i2);
+	k1 = _mm_movemask_ps(m1);
+	return sse_table_eq[k1*16+k0];
 }
-/*int TCmp::operator()(const ThreadParameter* t1, const ThreadParameter* t2)
-{
-	DWORD t;
-	t=t1->pid-t2->pid;
-	if (t==0)
-	{
-		t=t1->hook-t2->hook;
-		if (t==0)
-		{
-			t=t1->retn-t2->retn;
-			if (t==0) 
-			{
-				t=t1->spl-t2->spl;
-				if (t==0) goto _cmps;
-			}
-		}
-	}
-	t = (t&0x80000000)?-1:1;
-_cmps:
-	if (t!=cmpopr(t1,t2)) __asm int 3;
-	return t;
-}*/
 void TCpy::operator()(ThreadParameter* t1, ThreadParameter* t2)
 {
 	memcpy(t1,t2,sizeof(ThreadParameter));
@@ -344,9 +367,9 @@ HookManager::HookManager()
 	head.key->retn=-1;
 	head.key->spl=-1;
 	head.data=0;
-	table=new ThreadTable;
+	thread_table=new ThreadTable;
 	entry=new TextThread(0, -1,-1,-1, new_thread_number++);
-	table->SetThread(0,entry);
+	thread_table->SetThread(0,entry);
 	SetCurrent(entry);
 	entry->Status()|=USING_UNICODE;
 	texts->SetUnicode(true);
@@ -361,20 +384,20 @@ HookManager::HookManager()
 HookManager::~HookManager()
 {
 	NtWaitForSingleObject(destroy_event,0,0);
-	delete table;
+	delete thread_table;
 	delete head.key;
 	DeleteCriticalSection(&hmcs);
 }
 TextThread* HookManager::FindSingle(DWORD pid, DWORD hook, DWORD retn, DWORD split)
 {
-	if (pid==0) return table->FindThread(0);
+	if (pid==0) return thread_table->FindThread(0);
 	ThreadParameter tp={pid,hook,retn,split};
-	return table->FindThread(Search(&tp)->data);
+	return thread_table->FindThread(Search(&tp)->data);
 }
 TextThread* HookManager::FindSingle(DWORD number)
 {
 	if (number&0x80008000) return 0;
-	return table->FindThread(number);
+	return thread_table->FindThread(number);
 }
 TextThread* HookManager::GetCurrentThread() {return current;}
 void HookManager::SetCurrent(TextThread* it)
@@ -398,19 +421,19 @@ void HookManager::SelectCurrent(LPWSTR str)
 void HookManager::RemoveSingleHook(DWORD pid, DWORD addr)
 {
 	EnterCriticalSection(&hmcs);
-	DWORD max=table->Used();
+	DWORD max=thread_table->Used();
 	TextThread* it;
 	bool flag=false;
 	DWORD number;
 	for (DWORD i=1;i<=max;i++)
 	{
-		it=table->FindThread(i);
+		it=thread_table->FindThread(i);
 		if (it)
 		{
 			if (it->PID()==pid&&it->Addr()==addr)
 			{
 				flag|=it->RemoveFromCombo();
-				table->SetThread(i,0);
+				thread_table->SetThread(i,0);
 				if (it->Number()<new_thread_number)
 					new_thread_number=it->Number();				
 				Delete(it->GetThreadParameter());
@@ -420,10 +443,10 @@ void HookManager::RemoveSingleHook(DWORD pid, DWORD addr)
 	}
 	for (DWORD i=0;i<=max;i++)
 	{
-		it=table->FindThread(i);
+		it=thread_table->FindThread(i);
 		if (it==0) continue;
 		WORD ln=it->LinkNumber();
-		if (table->FindThread(ln)==0)
+		if (thread_table->FindThread(ln)==0)
 		{
 			it->LinkNumber()=-1;
 			it->Link()=0;
@@ -435,7 +458,7 @@ void HookManager::RemoveSingleHook(DWORD pid, DWORD addr)
 		if (head.Left)
 			number=head.Left->data;
 		else number=0;
-		it=table->FindThread(number);
+		it=thread_table->FindThread(number);
 		it->ResetEditText();
 	}
 	LeaveCriticalSection(&hmcs);
@@ -445,18 +468,18 @@ void HookManager::RemoveSingleThread(DWORD number)
 	if (number==0) return;
 	bool flag;
 	EnterCriticalSection(&hmcs);
-	TextThread* it=table->FindThread(number);
+	TextThread* it=thread_table->FindThread(number);
 	if (it)
 	{
-		table->SetThread(number,0);
+		thread_table->SetThread(number,0);
 		Delete(it->GetThreadParameter());
 		flag=it->RemoveFromCombo();
 		if (it->Number()<new_thread_number)
 			new_thread_number=it->Number();
 		delete it;
-		for (int i=0;i<=table->Used();i++)
+		for (int i=0;i<=thread_table->Used();i++)
 		{
-			it=table->FindThread(i);
+			it=thread_table->FindThread(i);
 			if (it==0) continue;
 			if (it->LinkNumber()==number)
 			{
@@ -471,7 +494,7 @@ void HookManager::RemoveSingleThread(DWORD number)
 				number=head.Left->data;
 			else number=0;
 
-			it=table->FindThread(number);
+			it=thread_table->FindThread(number);
 			it->ResetEditText();
 		}
 	}
@@ -482,29 +505,30 @@ void HookManager::RemoveProcessContext(DWORD pid)
 	TextThread* it;
 	bool flag=false;
 	DWORD ln;
-	for (int i=1;i<table->Used();i++)
+	for (int i=1;i<thread_table->Used();i++)
 	{
-		it=table->FindThread(i);
+		it=thread_table->FindThread(i);
 		if (it)
 		{
 			if (it->PID()==pid)
 			{
-				Delete(it->GetThreadParameter());
+				if (false==Delete(it->GetThreadParameter()))
+					__asm int 3;
 				flag|=it->RemoveFromCombo();
 				if (it->Number()<new_thread_number)
 					new_thread_number=it->Number();
-				table->SetThread(i,0);
+				thread_table->SetThread(i,0);
 				delete it;
 			}
 		}
 	}
-	for (int i=0;i<table->Used();i++)
+	for (int i=0;i<thread_table->Used();i++)
 	{
-		it=table->FindThread(i);
+		it=thread_table->FindThread(i);
 		if (it==0) continue;
 		if (it->Link()==0) continue;
 		ln=it->LinkNumber();
-		if (table->FindThread(ln)==0)
+		if (thread_table->FindThread(ln)==0)
 		{
 			it->LinkNumber()=-1;
 			it->Link()=0;
@@ -516,14 +540,14 @@ void HookManager::RemoveProcessContext(DWORD pid)
 		if (head.Left)
 			ln=head.Left->data;
 		else ln=0;
-		it=table->FindThread(ln);
+		it=thread_table->FindThread(ln);
 		if (it) it->ResetEditText();
 		else __asm int 3
 	}
 }
 void HookManager::RegisterThread(TextThread* it, DWORD num)
 {
-	table->SetThread(num,it);
+	thread_table->SetThread(num,it);
 }
 void HookManager::RegisterPipe(HANDLE text, HANDLE cmd, HANDLE thread)
 {
@@ -644,16 +668,13 @@ void HookManager::AddLink(WORD from, WORD to)
 	bool flag=false;
 	TextThread *from_thread, *to_thread;
 	EnterCriticalSection(&hmcs);
-	from_thread=table->FindThread(from);
-	to_thread=table->FindThread(to);
+	from_thread=thread_table->FindThread(from);
+	to_thread=thread_table->FindThread(to);
 	if (to_thread&&from_thread)
 	{
 		if (from_thread->Link()==to_thread) 
-		{
 			AddConsoleOutput(ErrorLinkExist);
-			return;
-		}
-		if (to_thread->CheckCycle(from_thread))
+		else if (to_thread->CheckCycle(from_thread))
 			AddConsoleOutput(ErrorCylicLink);
 		else
 		{
@@ -668,7 +689,7 @@ void HookManager::AddLink(WORD from, WORD to)
 		AddConsoleOutput(ErrorLink);
 	LeaveCriticalSection(&hmcs);
 }
-void HookManager::AddText(DWORD pid, BYTE* text, DWORD hook, DWORD retn, DWORD spl, int len)
+void HookManager::DispatchText(DWORD pid, BYTE* text, DWORD hook, DWORD retn, DWORD spl, int len)
 {
 	bool flag=false;
 	TextThread *it;
@@ -687,13 +708,13 @@ void HookManager::AddText(DWORD pid, BYTE* text, DWORD hook, DWORD retn, DWORD s
 	else number=0;
 	if (number!=-1)
 	{
-		it=table->FindThread(number);
+		it=thread_table->FindThread(number);
 	}
 	else
 	{
 		Insert(&tp,new_thread_number);
 		it=new TextThread(pid, hook,retn,spl,new_thread_number);
-		while (table->FindThread(++new_thread_number));	
+		while (thread_table->FindThread(++new_thread_number));	
 		WCHAR entstr[0x200];
 		it->GetEntryString(entstr);
 		AddConsoleOutput(entstr);
@@ -706,7 +727,7 @@ void HookManager::AddConsoleOutput(LPCWSTR text)
 	if (text)
 	{
 		int len=wcslen(text)<<1;
-		TextThread *console=table->FindThread(0);
+		TextThread *console=thread_table->FindThread(0);
 		//EnterCriticalSection(&hmcs);
 		console->AddToStore((BYTE*)text,len,false,true);
 		console->AddToStore((BYTE*)L"\r\n",4,true,true);
@@ -723,7 +744,7 @@ void HookManager::ClearText(DWORD pid, DWORD hook, DWORD retn, DWORD spl)
 	in=Search(&tp);
 	if (in)
 	{
-		it=table->FindThread(in->data);
+		it=thread_table->FindThread(in->data);
 		it->Reset();
 		it->ResetEditText();
 	}
@@ -741,9 +762,9 @@ void HookManager::ResetRepeatStatus()
 	EnterCriticalSection(&hmcs);
 	int i;
 	TextThread* t;
-	for (i=1;i<table->Used();i++)
+	for (i=1;i<thread_table->Used();i++)
 	{
-		t=table->FindThread(i);
+		t=thread_table->FindThread(i);
 		if (t==0) continue;
 		t->ResetRepeatStatus();
 	}
@@ -1707,7 +1728,7 @@ void CopyToClipboard(void* str,bool unicode, int len)
 }
 void ConsoleOutput(const LPCWSTR text)
 {
-	man->AddConsoleOutput(text);
+	if (running) man->AddConsoleOutput(text);
 }
 DWORD	GetCurrentPID()
 {
