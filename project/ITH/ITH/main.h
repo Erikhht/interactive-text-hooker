@@ -16,7 +16,6 @@
  */
 
 #pragma once
-#define _INC_SWPRINTF_INL_
 #include "..\common.h"
 #include "..\ntdll.h"
 #include "..\sys.h"
@@ -32,12 +31,16 @@ class HookManager;
 class CommandQueue;
 class TextHook;
 class BitMap;
+class CustomFilterMultiByte;
+class CustomFilterUnicode;
 class ProfileManager;
 #define TextHook Hook
 GLOBAL bool running;
 
 GLOBAL HINSTANCE hIns;
 GLOBAL BitMap *pid_map;
+GLOBAL CustomFilterMultiByte *mb_filter;
+GLOBAL CustomFilterUnicode *uni_filter;
 GLOBAL TextBuffer *texts;
 GLOBAL HookManager *man;
 GLOBAL ProfileManager *pfman;
@@ -48,7 +51,7 @@ GLOBAL WCHAR command[];
 GLOBAL HANDLE hPipeExist;
 GLOBAL DWORD split_time, process_time, inject_delay, insert_delay;
 GLOBAL DWORD auto_inject, auto_insert;
-GLOBAL DWORD cyclic_remove,clipboard_flag;
+GLOBAL DWORD cyclic_remove,clipboard_flag,global_filter;
 GLOBAL CRITICAL_SECTION detach_cs;
 DWORD WINAPI RecvThread(LPVOID lpThreadParameter);
 DWORD WINAPI CmdThread(LPVOID lpThreadParameter);

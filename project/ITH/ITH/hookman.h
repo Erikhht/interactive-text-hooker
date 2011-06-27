@@ -23,14 +23,42 @@ class BitMap
 {
 public:
 	BitMap();
+	BitMap(DWORD init_size);
 	~BitMap();
 	bool Check(DWORD number);
-	void Init(BYTE* m, DWORD size);
 	void Set(DWORD number);
+	void Reset();
 	void Clear(DWORD number);
-private:
+protected:
 	BYTE* map;
 	DWORD size;
+};
+typedef void (*CustomFilterCallBack) (WORD);
+
+class CustomFilterUnicode : public BitMap
+{
+public:
+	CustomFilterUnicode();
+	~CustomFilterUnicode();
+	bool Check(WORD number);
+	void Set(WORD number);
+	void Clear(WORD number);
+	void Traverse(CustomFilterCallBack callback);
+
+};
+
+class CustomFilterMultiByte : public BitMap
+{
+public:
+	CustomFilterMultiByte();
+	~CustomFilterMultiByte();
+	bool Check(WORD number);
+	void Set(WORD number);
+	void Clear(WORD number);
+	void Reset();
+	void Traverse(CustomFilterCallBack callback);
+private:
+	BYTE ascii_map[0x20];
 };
 
 #define MAX_REGISTER 0xF

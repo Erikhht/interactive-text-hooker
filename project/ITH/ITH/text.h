@@ -30,9 +30,7 @@ public:
 	void ClearBuffer();
 	void SetUnicode(bool mode);
 	void SetLine();
-	void SetFlushTimer(UINT t);
 private:
-	UINT timer;
 	bool line;
 	bool unicode;
 };

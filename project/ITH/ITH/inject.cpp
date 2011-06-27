@@ -38,6 +38,7 @@ DWORD Inject(HANDLE hProc)
 	HANDLE hTH;
 	if (!IthCheckFile(EngineName)) return -1;
 	if (!IthCheckFile(DllName)) return -1;
+
 	NtAllocateVirtualMemory(hProc,&lpvAllocAddr,0,&dwWrite,
 		MEM_COMMIT,PAGE_READWRITE);
 	if (lpvAllocAddr==0) return -1;
@@ -102,6 +103,8 @@ DWORD PIDByName(LPWSTR pwcTarget)
 }
 DWORD InjectByPID(DWORD pid)
 {
+	WCHAR str[0x80];
+	DWORD s;
 	if (pid==current_process_id) 
 	{
 		ConsoleOutput(SelfAttach);
@@ -112,6 +115,9 @@ DWORD InjectByPID(DWORD pid)
 		ConsoleOutput(AlreadyAttach);
 		return -1;
 	}
+	swprintf(str,L"ITH_HOOKMAN_%.4d",pid);
+	NtClose(IthCreateMutex(str,0,&s));
+	if (s) return -1;
 	CLIENT_ID id;
 	OBJECT_ATTRIBUTES oa={0};
 	HANDLE hProc;
@@ -133,7 +139,7 @@ DWORD InjectByPID(DWORD pid)
 	
 	NtClose(hProc);
 	if (module==-1) return -1;
-	WCHAR str[0x80];
+	
 	swprintf(str,FormatInject,pid,module);
 	ConsoleOutput(str);
 	return module;

@@ -162,6 +162,7 @@
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
       <StringPooling>true</StringPooling>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
     </ClCompile>
     <Link>
       <AdditionalDependencies>..\msvcrt.lib;..\ith_sys.lib;..\ntdll.lib;comctl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -182,12 +183,15 @@
       <Version>
       </Version>
       <ShowProgress>NotSet</ShowProgress>
-      <UACExecutionLevel>AsInvoker</UACExecutionLevel>
-      <EnableUAC>false</EnableUAC>
+      <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
+      <EnableUAC>true</EnableUAC>
     </Link>
     <PostBuildEvent>
       <Command>..\release\EnableSEH ith.exe</Command>
     </PostBuildEvent>
+    <PreBuildEvent>
+      <Command>..\release\version</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -228,6 +232,7 @@
   <ItemGroup>
     <ClCompile Include="command.cpp" />
     <ClCompile Include="inject.cpp" />
+    <ClCompile Include="language.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="pipe.cpp" />
     <ClCompile Include="profile.cpp" />
@@ -237,6 +242,7 @@
   <ItemGroup>
     <ClInclude Include="cmdq.h" />
     <ClInclude Include="hookman.h" />
+    <ClInclude Include="language.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="main_template.h" />
     <ClInclude Include="profile.h" />

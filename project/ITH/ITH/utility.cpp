@@ -16,6 +16,7 @@
  */
 #include "hookman.h"
 #include "profile.h"
+#include "..\version.h"
 #include <emmintrin.h>
 #define MAX_ENTRY 0x40
 //#include <richedit.h>
@@ -116,22 +117,29 @@ DWORD WINAPI FlushThread(LPVOID lpThreadParameter)
 {
 	LARGE_INTEGER sleep_interval={-100000,-1};
 	while (hwndEdit==0) NtDelayExecution(0,&sleep_interval);
-		//IthSleep(10);
 	TextBuffer* t=(TextBuffer*)lpThreadParameter;
 	while (running) {
 		t->Flush();
 		NtDelayExecution(0,&sleep_interval);
-		//IthSleep(10);
 	}
-	//t->SetFlushTimer(SetTimer(0,0x123456,10,AddFun));
 	return 0;
 }
-BitMap::BitMap()
+BitMap::BitMap(): size(0x20)
 {
-	size=0x20;
+	//map=new BYTE[size];
+}
+BitMap::BitMap(DWORD init_size): size(init_size>>3)
+{
 	map=new BYTE[size];
 }
-BitMap::~BitMap(){delete map;}
+BitMap::~BitMap()
+{
+	if (map) 
+	{
+		delete map;
+		map=0;
+	}
+}
 bool BitMap::Check(DWORD number)
 {	
 	if ((number>>3)>=size) return false;
@@ -155,10 +163,196 @@ void BitMap::Set(DWORD number)
 	}	
 	map[number>>3]|=1<<(number&7);
 }
+void BitMap::Reset()
+{
+	memset(map,0,size);
+}
 void BitMap::Clear(DWORD number)
 {
 	if ((number>>3)>=size) return;
 	map[number>>3]&=~(1<<(number&7));
+}
+
+CustomFilterUnicode::CustomFilterUnicode()
+{
+	map=0;
+	size=0x2000;
+	NtAllocateVirtualMemory(NtCurrentProcess(),(PVOID*)&map,0,&size,MEM_COMMIT,PAGE_READWRITE);
+}
+CustomFilterUnicode::~CustomFilterUnicode()
+{
+	NtFreeVirtualMemory(NtCurrentProcess(),(PVOID*)&map,&size,MEM_RELEASE);
+	map=0;
+}
+void CustomFilterUnicode::Set(WORD number)
+{
+	map[number>>3]|=1<<(number&7);
+
+}
+void CustomFilterUnicode::Clear(WORD number)
+{
+	map[number>>3]&=~(1<<(number&7));
+
+}
+bool CustomFilterUnicode::Check(WORD number)
+{
+	return (map[number>>3]>>(number&7))&1;
+}
+void CustomFilterUnicode::Traverse(CustomFilterCallBack callback)
+{
+	union{ __m128d m0; __m128i i0;};
+	union{ __m128d m1; __m128i i1;};
+	DWORD mask,i,j,k,t,ch;
+	m1=_mm_loadu_pd((const double*)zeros);
+	BYTE* ptr=map;
+	BYTE* end=map+size;
+	while (ptr<end) //multi byte
+	{
+		m0=_mm_load_pd((const double*)ptr);
+		i0=_mm_cmpeq_epi8(i0,i1); //SSE zero test, 16 bytes/loop, 256 bit/loop, overall 256 loop.
+		mask=_mm_movemask_epi8(i0);
+		if (mask!=0xFFFF)
+		{
+			for (i=0;i<0x10;i+=4)
+			{
+				if (*(DWORD*)(ptr+i)==0) continue; //dword compare, 4 bytes/loop
+				for (j=0;j<4;j++)
+				{
+					if (ptr[i+j]) //byte compare, one byte/loop
+					{
+						t=1;
+						for (k=0;k<8;k++)//test bit, one bit/loop
+						{
+							if (ptr[i+j]&t) 
+							{
+								ch=((ptr-map+i+j)<<3)+k;			
+								callback(ch&0xFFFF);
+							}
+							t<<=1;
+						}
+					}
+				}
+			}
+		}
+		ptr+=0x10;
+	}
+}
+
+CustomFilterMultiByte::CustomFilterMultiByte()
+{
+	map=0;
+	size=0x1000;
+	NtAllocateVirtualMemory(NtCurrentProcess(),(PVOID*)&map,0,&size,MEM_COMMIT,PAGE_READWRITE);
+
+}
+CustomFilterMultiByte::~CustomFilterMultiByte()
+{
+	NtFreeVirtualMemory(NtCurrentProcess(),(PVOID*)&map,&size,MEM_RELEASE);
+	map=0;
+}
+void CustomFilterMultiByte::Set(WORD number)
+{
+	BYTE c=number&0xFF;
+	if (LeadByteTable[c]==1) ascii_map[c>>3]|=1<<(c&7);
+	else
+	{
+		number>>=8;
+		number|=(c-0x80)<<8;
+		map[number>>3]|=1<<(number&7);
+	}
+
+}
+void CustomFilterMultiByte::Clear(WORD number)
+{
+	BYTE c=number&0xFF;
+	if (LeadByteTable[c]==1) ascii_map[c>>3]&=~(1<<(c&7));
+	else
+	{
+		number>>=8;
+		number|=(c-0x80)<<8;
+		map[number>>3]&=~(1<<(number&7));
+	}
+}
+bool CustomFilterMultiByte::Check(WORD number)
+{
+	BYTE c=number&0xFF;
+	if (LeadByteTable[c]==1)
+		return (ascii_map[c>>3]>>(c&7))&1;
+	else
+	{
+		number=(number>>8)+((c-0x80)<<8);
+		return (map[number>>3]>>(number&7))&1;
+	}
+}
+void CustomFilterMultiByte::Reset()
+{
+	BitMap::Reset();
+	memset(ascii_map,0,0x20);
+}
+void CustomFilterMultiByte::Traverse(CustomFilterCallBack callback)
+{
+	union{ __m128d m0; __m128i i0;};
+	union{ __m128d m1; __m128i i1;};
+	DWORD mask,i,j,k,t,ch,cl;
+	m1=_mm_loadu_pd((const double*)zeros);
+	BYTE* ptr=map;
+	BYTE* end=map+size;
+	while (ptr<end) //multi byte
+	{
+		m0=_mm_load_pd((const double*)ptr);
+		i0=_mm_cmpeq_epi8(i0,i1); //SSE zero test, 16 bytes/loop, 256 bit/loop, overall 256 loop.
+		mask=_mm_movemask_epi8(i0);
+		if (mask!=0xFFFF)
+		{
+			for (i=0;i<0x10;i+=4)
+			{
+				if (*(DWORD*)(ptr+i)==0) continue; //dword compare, 4 bytes/loop
+				for (j=0;j<4;j++)
+				{
+					if (ptr[i+j]) //byte compare, one byte/loop
+					{
+						t=1;
+						for (k=0;k<8;k++)//test bit, one bit/loop
+						{
+							if (ptr[i+j]&t) 
+							{
+								ch=((ptr-map+i+j)<<3)+k;			
+								cl=(ch&0xFF)<<8;
+								ch=(ch>>8)+0x80;
+								ch|=cl;
+								callback(ch&0xFFFF);
+							}
+							t<<=1;
+						}
+					}
+				}
+			}
+		}
+		ptr+=0x10;
+	}
+
+	for (i=0;i<0x20;i+=4) //single byte
+	{
+		if (*(DWORD*)(ascii_map+i))
+		{
+			for (j=0;j<4;j++)
+			{
+				if (ascii_map[i+j])
+				{
+					t=1;
+					for (k=0;k<8;k++)
+					{
+						if (ascii_map[i+j]&t)
+						{
+							ch=((i+j)<<3)+k;
+							callback(ch&0xFFFF);
+						}
+						t<<=1;
+					}
+				}
+			}
+		}
+	}
 }
 
 TextBuffer::TextBuffer():line(false),unicode(false)
@@ -168,7 +362,6 @@ TextBuffer::TextBuffer():line(false),unicode(false)
 }
 TextBuffer::~TextBuffer()
 {
-	KillTimer(hMainWnd,timer);
 }
 void TextBuffer::AddText(BYTE* text,int len, bool l=false)
 {
@@ -233,17 +426,11 @@ void TextBuffer::Flush()
 		if (uni!=temp) delete uni;
 	}
 	used=0;
-	//printf("%.4X:Flush leave.\n",used);
 	LeaveCriticalSection(&cs_store);
 }
 void TextBuffer::SetLine()
 {
 	line=true;
-}
-
-void TextBuffer::SetFlushTimer(UINT t)
-{
-	timer=t;
 }
 
 void ThreadTable::SetThread(DWORD num, TextThread* ptr)
@@ -276,24 +463,6 @@ TextThread* ThreadTable::FindThread(DWORD number)
 	else return 0;
 }
 
-/*static const char sse_table_neq[0x100]={
-	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, //0, equal
-	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //1, compare 1
-	1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, //2, compare 2
-	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //3, compare 1
-	1,1,1,1, -1,-1,-1,-1, 1,1,1,1, -1,-1,-1,-1, //4, compare 3
-	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //5, compare 1
-	1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, //6, compare 2
-	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //7, compare 1
-	1,1,1,1, 1,1,1,1, -1,-1,-1,-1, -1,-1,-1,-1, //8, compare 4
-	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //9, compare 1
-	1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, //a, compare 2
-	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //b, compare 1
-	1,1,1,1, -1,-1,-1,-1, 1,1,1,1, -1,-1,-1,-1, //c, compare 3
-	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //d, compare 1
-	1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, //e, compare 2
-	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1  //f, compare 1
-};*/
 static const char sse_table_eq[0x100]={
 	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //0, compare 1
 	1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, //1, compare 2
@@ -334,20 +503,11 @@ char TCmp::operator()(const ThreadParameter* t1, const ThreadParameter* t2)
 		__m128d d2;
 	};
 	int k0,k1;
-	/*zero = _mm_loadu_ps((const float*)zeros);
-	d0 = _mm_loadu_ps((const float*)t1);
-	d1 = _mm_loadu_ps((const float*)t2);
-	d2 = _mm_xor_ps(d0, d1);
-	d2 = _mm_cmpneq_ps(d2,zero);
-	d0 = _mm_cmplt_ps(d0,d1);	
-	m0 = _mm_movemask_ps(d0);
-	m1 = _mm_movemask_ps(d2);
-	return table[m1*16+m0];*/
 	d1 = _mm_loadu_pd((const double*)t1);
 	d2 = _mm_loadu_pd((const double*)t2);
 	i0 = _mm_sub_epi32(i1,i2);
-	k0 = _mm_movemask_ps(m0);
 	i1 = _mm_cmpeq_epi32(i1,i2);
+	k0 = _mm_movemask_ps(m0);
 	k1 = _mm_movemask_ps(m1);
 	return sse_table_eq[k1*16+k0];
 }
@@ -375,6 +535,7 @@ HookManager::HookManager()
 	texts->SetUnicode(true);
 	entry->AddToCombo();
 	entry->ComboSelectCurrent();
+	entry->AddToStore((BYTE*)version,wcslen(version)<<1,0,1);
 	entry->AddToStore((BYTE*)InitMessage,wcslen(InitMessage)<<1,0,1);
 	if (background==0) entry->AddToStore((BYTE*)BackgroundMsg,wcslen(BackgroundMsg)<<1,0,1);
 
@@ -542,7 +703,7 @@ void HookManager::RemoveProcessContext(DWORD pid)
 		else ln=0;
 		it=thread_table->FindThread(ln);
 		if (it) it->ResetEditText();
-		else __asm int 3
+		//else __asm int 3
 	}
 }
 void HookManager::RegisterThread(TextThread* it, DWORD num)
@@ -593,7 +754,7 @@ void HookManager::RegisterProcess(DWORD pid, DWORD hookman, DWORD module, DWORD 
 		return;
 	}
 
-	swprintf(str,L"ITH_HOOKMAN_%d",pid);
+	swprintf(str,L"ITH_HOOKMAN_%.4d",pid);
 	record[register_count-1].hookman_mutex=IthOpenMutex(str);
 	if (GetProcessPath(pid,path)==false) path[0]=0;
 	swprintf(str,L"%.4d:%s",pid,wcsrchr(path,L'\\')+1);
@@ -1370,20 +1531,66 @@ void TextThread::PrevRepeatLength(DWORD &len)
 void TextThread::AddToStore(BYTE* con,int len, bool new_line,bool console)
 {
 	if (con==0) return;
-	if (!new_line&&!console) 
+	if (!console)
 	{
-		if (repeat_count) 
+		if (global_filter)
 		{
-			status|=REPEAT_NUMBER_DECIDED;
-			RemoveSingleRepeatForce(con,len);
+			int i,j,k;
+			union {WORD ch;BYTE cb[2];};
+			if (status&USING_UNICODE)
+			{
+				for (i=0,j=0;i<len;i+=2)
+				{
+					ch=*(WORD*)(con+i);
+					if (!uni_filter->Check(ch))
+					{
+						*(WORD*)(con+j)=ch;
+						j+=2;
+					}
+				}
+			}
+			else
+			{
+				for (i=0,j=0;i<len;i+=k)
+				{
+					ch=*(WORD*)(con+i);
+					k=LeadByteTable[con[i]];					
+					if (k==2)
+					{
+						if (!mb_filter->Check(ch))
+						{
+							*(WORD*)(con+j)=ch;
+							j+=2;
+						}
+					}
+					else
+					{
+						if (!mb_filter->Check(cb[0]))
+						{
+							con[j]=cb[0];
+							j++;
+						}
+					}
+				}
+			}
+			len=j;
 		}
-		else RemoveSingleRepeatAuto(con,len);
-	}
-	if (len<=0) return;
-	if(cyclic_remove&&!console) 
-	{
-		if (status&REPEAT_NUMBER_DECIDED)
-			RemoveCyclicRepeat(con,len);
+		if (len<=0) return;
+		if (!new_line) 
+		{
+			if (repeat_count) 
+			{
+				status|=REPEAT_NUMBER_DECIDED;
+				RemoveSingleRepeatForce(con,len);
+			}
+			else RemoveSingleRepeatAuto(con,len);
+		}
+		if (len<=0) return;
+		if(cyclic_remove) 
+		{
+			if (status&REPEAT_NUMBER_DECIDED)
+				RemoveCyclicRepeat(con,len);
+		}
 	}
 	if (len<=0) return;
 	if (status&BUFF_NEWLINE) AddLineBreak();
@@ -1602,7 +1809,7 @@ void TextThread::CopyLastToClipboard()
 }
 void TextThread::ExportTextToFile(LPWSTR filename)
 {
-	HANDLE hFile=IthCreateFile(filename,GENERIC_WRITE,0,FILE_OPEN_IF);
+	HANDLE hFile=IthCreateFile(filename,FILE_WRITE_DATA,0,FILE_OPEN_IF);
 	if (hFile==INVALID_HANDLE_VALUE) return;
 	EnterCriticalSection(&cs_store);
 	IO_STATUS_BLOCK ios;

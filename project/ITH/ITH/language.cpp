@@ -35,10 +35,8 @@ const wchar_t* ErrorNoAttach=L"No process attached.";
 
 //profile.cpp
 const wchar_t* ErrorMonitor=L"Can't monitor process.";
-
 //utility.cpp
-const wchar_t* InitMessage=L"Interactive Text Hooker 2.2 (2011.6.17)\r\n\
-Copyright (C) 2010-2011  kaosu (qiupf2000@gmail.com)\r\n\
+const wchar_t* InitMessage=L"Copyright (C) 2010-2011  kaosu (qiupf2000@gmail.com)\r\n\
 Source code <http://code.google.com/p/interactive-text-hooker/>\r\n\
 General discussion <http://www.hongfire.com/forum/showthread.php?t=208860>\r\n";
 const wchar_t* BackgroundMsg=L"If you feel tired about the pure white background,\r\n\

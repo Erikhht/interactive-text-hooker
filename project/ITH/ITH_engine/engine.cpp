@@ -356,7 +356,7 @@ void FindKiriKiriHook(DWORD fun, DWORD size, DWORD pt, DWORD flag)
 						{
 							//swprintf(str,L"Hook addr: 0x%.8X",pt+j);
 							//OutputConsole(str);
-							HookParam hp={0};
+							HookParam hp={};
 							hp.addr=(DWORD)pt+j;
 							hp.off=-0x8;
 							hp.ind=0x14;
@@ -417,7 +417,7 @@ void FindBGIHook(DWORD fun, DWORD size, DWORD pt, WORD sig)
 							{
 								//swprintf(str,L"Entry 2(final): 0x%.8X",pt+l);
 								//OutputConsole(str);
-								HookParam hp={0};
+								HookParam hp={};
 								hp.addr=(DWORD)pt+l;
 								hp.off=0x8;
 								hp.split=-0x18;
@@ -448,7 +448,7 @@ bool InsertRealliveDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 {
 	if (addr!=GetGlyphOutlineA) return false;
 	DWORD i,j;
-	HookParam hp={0};
+	HookParam hp={};
 	i=frame;
 	if (i!=0)
 	{
@@ -509,7 +509,7 @@ void InsertSiglusHook()
 	{
 		if (*(WORD*)base==0xFF6A)
 		{
-			HookParam hp={0};
+			HookParam hp={};
 			hp.addr=base;
 			hp.extern_fun=(DWORD)SpecialHookSiglus;
 			hp.type=EXTERN_HOOK|USING_UNICODE;
@@ -554,7 +554,7 @@ void SpecialHookMajiro(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* 
 }
 void InsertMajiroHook()
 {
-	HookParam hp={0};
+	HookParam hp={};
 
 	/*hp.off=0xC;
 	hp.split=4;
@@ -574,7 +574,7 @@ CMVS hook:
 ********************************************************************************************/
 void InsertCMVSHook()
 {
-	HookParam hp={0};
+	HookParam hp={};
 	hp.off=0x8;
 	hp.split=-0x18;
 	hp.type|=BIG_ENDIAN|USING_SPLIT;
@@ -617,7 +617,7 @@ void InsertRUGPHook()
 					t=low+t-i+1;
 					swprintf(str,L"HookAddr 0x%.8x",t);
 					OutputConsole(str);
-					HookParam hp={0};
+					HookParam hp={};
 					hp.addr=t;
 					hp.off=0x4;
 					hp.length_offset=1;
@@ -639,7 +639,7 @@ void InsertRUGPHook()
 					t=low+t-i+1;
 					swprintf(str,L"HookAddr 0x%.8x",t);
 					OutputConsole(str);
-					HookParam hp={0};
+					HookParam hp={};
 					hp.addr=t;
 					hp.off=0x4;
 					hp.length_offset=1;
@@ -659,7 +659,7 @@ Lucifen hook:
 ********************************************************************************************/
 void InsertLucifenHook()
 {
-	HookParam hp={0};
+	HookParam hp={};
 	hp.addr=(DWORD)GetTextExtentPoint32A;
 	hp.off=8;
 	hp.split=-0x18;
@@ -671,7 +671,7 @@ void InsertLucifenHook()
 /********************************************************************************************
 System40 hook:
 	System40 is a game engine developed by Alicesoft.
-	Afaik, there is 2 very different type of System40. Each requires a particular hook.
+	Afaik, there are 2 very different types of System40. Each requires a particular hook.
 
 	Pattern 1: Either SACTDX.dll or SACT2.dll exports SP_TextDraw.
 	The first relative call in this function draw text to some surface.
@@ -691,13 +691,13 @@ System40 hook:
 	At the entry point, EAX should be a pointer to some structre, character at +0x8.
 	Before calling this function, the caller put EAX onto stack, we can also find this
 	value on stack. But seems parameter order varies from game release. If a future
-	game break the EAX rule then we need to disassemble the caller code to determine
+	game breaks the EAX rule then we need to disassemble the caller code to determine
 	data offset dynamically.
 ********************************************************************************************/
 
 void InsertAliceHook1(DWORD addr, DWORD module, DWORD limit)
 {
-	HookParam hp={0};	
+	HookParam hp={};	
 	DWORD c,i,j,s=addr;
 	if (s==0) return;
 	for (i=s;i<s+0x100;i++)
@@ -728,7 +728,7 @@ void InsertAliceHook1(DWORD addr, DWORD module, DWORD limit)
 }
 void InsertAliceHook2(DWORD addr)
 {
-	HookParam hp={0};
+	HookParam hp={};
 	hp.addr=addr;
 	if (hp.addr==0) return;
 	hp.off=-0x8;
@@ -761,7 +761,7 @@ void InsertAtelierHook()
 	{
 		if (*(DWORD*)i==0xFF6ACCCC) //Find the function entry
 		{
-				HookParam hp={0};
+				HookParam hp={};
 				hp.addr=i+2;
 				hp.off=8;
 				hp.split=-0x18;
@@ -800,7 +800,7 @@ void InsertCircusHook()
 					k=*(DWORD*)(j+1)+j+5;
 					if (k>base&&k<size)
 					{
-						HookParam hp={0};
+						HookParam hp={};
 						hp.addr=k;
 						hp.off=0xC;
 						hp.split=-0x18;
@@ -819,7 +819,7 @@ void InsertCircusHook()
 	{
 		if (*(WORD*)i==0xEC83)
 		{
-			HookParam hp={0};
+			HookParam hp={};
 			hp.addr=i;
 			hp.off=8;
 			hp.type=USING_STRING;
@@ -891,7 +891,7 @@ void SpecialHookShina(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* s
 }
 void InsertShinaHook()
 {
-	HANDLE hFile=IthCreateFile(L"setup.ini",GENERIC_READ,FILE_SHARE_READ,OPEN_EXISTING);
+	HANDLE hFile=IthCreateFile(L"setup.ini",FILE_READ_DATA,FILE_SHARE_READ,FILE_OPEN);
 	if (hFile!=INVALID_HANDLE_VALUE)
 	{
 		IO_STATUS_BLOCK ios;
@@ -916,7 +916,7 @@ void InsertShinaHook()
 			j=ptr-version;
 			for (i=0;i<j;i++)
 				file[i]=version[i];
-			hFile=IthCreateFile(file,GENERIC_READ,FILE_SHARE_READ,OPEN_EXISTING);
+			hFile=IthCreateFile(file,FILE_READ_DATA,FILE_SHARE_READ,FILE_OPEN);
 			NtReadFile(hFile,0,0,0,&ios,small_buffer,0x40,0,0);
 			NtClose(hFile);
 			small_buffer[0x3F]=0;
@@ -925,7 +925,7 @@ void InsertShinaHook()
 			sscanf(version+0x3,"%d",&ver);
 			if (ver>40)
 			{
-				HookParam hp={0};
+				HookParam hp={};
 				if (ver==48)
 				{
 					hp.addr=(DWORD)GetTextExtentPoint32A;
@@ -976,7 +976,7 @@ void InsertTinkerBellHook()
 {
 	DWORD s1,s2,i;
 	DWORD ch=0x8141;
-	HookParam hp={0};
+	HookParam hp={};
 	hp.off=0xC;
 	hp.length_offset=1;
 	hp.type=DATA_INDIRECT;
@@ -1010,7 +1010,7 @@ void InsertTinkerBellHook()
 }
 void InsertLuneHook()
 {
-	HookParam hp={0};
+	HookParam hp={};
 	DWORD c=FindCallOrJmpAbs((DWORD)ExtTextOutA,module_limit-module_base,(DWORD)module_base,true);
 	if (c==0) return;
 	hp.addr=FindCallAndEntryRel(c,module_limit-module_base,(DWORD)module_base,0xEC8B55);
@@ -1046,7 +1046,7 @@ void InsertWhirlpoolHook()
 		}
 	}
 	if (i==entry-0x100) return;
-	HookParam hp={0};
+	HookParam hp={};
 	hp.addr=i+t;
 	hp.off=-0x24;
 	hp.split=-0x8;
@@ -1056,7 +1056,7 @@ void InsertWhirlpoolHook()
 }
 void InsertCotophaHook()
 {	
-	HookParam hp={0};
+	HookParam hp={};
 	hp.addr=FindCallAndEntryAbs((DWORD)GetTextMetricsA,module_limit-module_base,module_base,0xEC8B55);
 	if (hp.addr==0) return;
 	hp.off=4;
@@ -1067,7 +1067,7 @@ void InsertCotophaHook()
 }
 void InsertCatSystem2Hook()
 {
-	HookParam hp={0};
+	HookParam hp={};
 	DWORD search=0x95EB60F;
 	DWORD j,i=SearchPattern(module_base,module_limit-module_base,&search,4);
 	if (i==0) return;
@@ -1109,7 +1109,7 @@ void InsertNitroPlusHook()
 }
 void InsertRetouchHook()
 {
-	HookParam hp={0};
+	HookParam hp={};
 	if (GetFunctionAddr("?printSub@RetouchPrintManager@@AAE_NPBDAAVUxPrintData@@K@Z",&hp.addr,0,0,0))
 	{
 		hp.off=4;
@@ -1143,7 +1143,7 @@ void InsertMalieHook()
 	j=i+module_base+3;
 	i=SearchPattern(j,module_limit-j,&sig2,2);
 	if (j==0) return;
-	HookParam hp={0};
+	HookParam hp={};
 	hp.addr=j+i;
 	hp.off=-0x14;
 	hp.ind=-0x8;
@@ -1178,7 +1178,7 @@ void InsertEMEHook()
 
 	if (c)
 	{
-		HookParam hp={0};
+		HookParam hp={};
 		hp.addr=c;
 		hp.off=-0x8;
 		hp.length_offset=1;
@@ -1201,7 +1201,7 @@ void InsertRREHook()
 	{
 		WORD sig = 0x51C3;
 		
-		HookParam hp={0};
+		HookParam hp={};
 		hp.addr=c;	
 		hp.length_offset=1;
 		hp.type=NO_CONTEXT|DATA_INDIRECT;
@@ -1295,7 +1295,7 @@ bool InsertLiveDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 {
 	if (addr!=GetGlyphOutlineA) return false;
 	DWORD i,j,k;
-	HookParam hp={0};
+	HookParam hp={};
 	i=frame;
 	if (i!=0)
 	{
@@ -1329,7 +1329,7 @@ void InsertLiveHook()
 	DWORD i=SearchPattern(module_base,module_limit-module_base,sig,7);
 	if (i)
 	{
-		HookParam hp={0};
+		HookParam hp={};
 		hp.addr=i+module_base;
 		hp.off=-0x10;
 		hp.length_offset=1;
@@ -1459,7 +1459,7 @@ bool InsertSofthouseDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 		{
 			if ((*(WORD*)(k-6)==0x15FF)||*(BYTE*)(k-5)==0xE8)
 			{				
-				HookParam hp={0};
+				HookParam hp={};
 				hp.off=0x4;
 				hp.extern_fun=(DWORD)SpecialHookSofthouse;
 				hp.type=USING_STRING|EXTERN_HOOK;
@@ -1487,7 +1487,7 @@ void InsertSoftHouseHook()
 bool InsertIGSDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 {
 	if (addr!=GetGlyphOutlineW) return false;
-	HookParam hp={0};
+	HookParam hp={};
 	DWORD i,j,k,t;
 	i=*(DWORD*)frame;
 	i=*(DWORD*)(i+4);
@@ -1530,7 +1530,7 @@ bool InsertDotNetDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 	ptr=*(DWORD*)(ptr+4);
 	if (*(WORD*)(ptr-6)==0x15FF)
 	{
-		HookParam hp={0};
+		HookParam hp={};
 		ptr=*(DWORD*)(ptr-4);
 		hp.addr=*(DWORD*)(ptr);
 		hp.extern_fun=(DWORD)SpecialHookDotNet;
@@ -1551,7 +1551,7 @@ void InsertDotNetHook1(DWORD module, DWORD module_limit)
 		j=SearchPattern(module+i+4,size-i-4,&sig,3);
 		if (j)
 		{
-			HookParam hp={0};
+			HookParam hp={};
 			hp.addr=module+i+j+7;
 			hp.off=-0x20;
 			hp.split=0x18;

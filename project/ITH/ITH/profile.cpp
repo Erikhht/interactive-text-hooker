@@ -40,6 +40,7 @@ DWORD WINAPI InjectThread(LPVOID lpThreadParameter)
 	IthSleep(inject_delay);
 	DWORD s=InjectByPID(pid);
 	if (!auto_insert) return s;
+	if (s==-1) return s;
 	IthSleep(insert_delay);
 	if (GetProcessPath(pid,path))
 	{
@@ -312,7 +313,7 @@ void ProfileManager::ClearProfile()
 }
 void ProfileManager::LoadProfile()
 {
-	HANDLE hFile=IthCreateFile(L"ITH.pro",GENERIC_READ,FILE_SHARE_READ,FILE_OPEN);
+	HANDLE hFile=IthCreateFile(L"ITH.pro",FILE_READ_DATA,FILE_SHARE_READ,FILE_OPEN);
 	if (hFile==INVALID_HANDLE_VALUE) return;
 	DWORD i,j,profile_count;
 	IO_STATUS_BLOCK ios;
@@ -362,7 +363,7 @@ void ProfileManager::SaveProfile()
 	*(DWORD*)(buffer)=pftree.Count();
 	NodeWrite nw(buffer,(LPWSTR)(buffer+ns.name_off));
 	pftree.TraverseTree<NodeWrite>(nw);
-	HANDLE hFile=IthCreateFile(L"ITH.pro",GENERIC_WRITE,FILE_SHARE_READ,FILE_OVERWRITE_IF);
+	HANDLE hFile=IthCreateFile(L"ITH.pro",FILE_WRITE_DATA,FILE_SHARE_READ,FILE_OVERWRITE_IF);
 	IO_STATUS_BLOCK ios;
 	if (hFile!=INVALID_HANDLE_VALUE)
 	{

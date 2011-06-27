@@ -41,8 +41,9 @@ public:
 	}
 	virtual ~MyVector()
 	{
-		delete []storage;
+		if (storage) delete []storage;
 		DeleteCriticalSection(&cs_store);
+		storage=0;
 	}
 	void Reset()
 	{

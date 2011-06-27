@@ -154,3 +154,35 @@ public:
 };
 
 void ExportSingleProfile(ProfileNode* pfn, MyVector<WCHAR,0x1000,WCMP> &export_text);
+
+class FilterWindow
+{
+public:
+	FilterWindow(HWND hDialog);
+	~FilterWindow();
+	void Init();
+	void SetCurrentChar();
+	void SelectCurrentChar(DWORD index);
+	void InitWithChar(WCHAR);
+	void DeleteCurrentChar();
+	void AddNewChar();
+	void DrawGlyph(WCHAR);
+	void ClearGlyphArea();
+	void SetUniChar(WCHAR);
+	void SetMBChar(WORD);
+	void SetCommitFlag();
+	UINT IsSJISCheck();
+	UINT IsUnicodeCheck();
+private:
+	TEXTMETRIC tm;
+	RECT rc;
+	HWND hDlg;
+	HWND hList;
+	HWND hGlyph;
+	HDC hGlyphDC;
+	HBRUSH white;
+	HFONT hGlyphFont;
+	HWND hSJIS,hUnicode,hChar;
+	DWORD init_x,init_y;
+	BYTE modify,remove,commit;
+};

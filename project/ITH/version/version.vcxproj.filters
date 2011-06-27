@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="engine.cpp">
+    <ClCompile Include="version.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

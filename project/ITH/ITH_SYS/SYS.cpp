@@ -442,21 +442,21 @@ void IthInitSystemService()
 	}
 	else
 	{
-	while (*t--!=L':');
-	wcscpy(file_path+4,t);
-	t=file_path;
-	while(*++t);
-	if (*(t-1)!=L'\\') *t++=L'\\';
-	wcscpy(t,L"C_932.nls");
-	RtlInitUnicodeString(&us,file_path);
-	NtOpenFile(&codepage_file,FILE_READ_DATA,&oa,&ios,FILE_SHARE_READ,0);
-	oa.hRootDirectory=root_obj;
-	oa.uAttributes|=OBJ_OPENIF;
-	RtlInitUnicodeString(&us,L"JPN_CodePage");	
-	NtCreateSection(&codepage_section,SECTION_MAP_READ,&oa,0,PAGE_READONLY,SEC_COMMIT,codepage_file);
-	NtClose(codepage_file); 
-	size=0;
-	NtMapViewOfSection(codepage_section,NtCurrentProcess(),&page,0,0,0,&size,ViewUnmap,0,PAGE_READONLY);
+		while (*t--!=L':');
+		wcscpy(file_path+4,t);
+		t=file_path;
+		while(*++t);
+		if (*(t-1)!=L'\\') *t++=L'\\';
+		wcscpy(t,L"C_932.nls");
+		RtlInitUnicodeString(&us,file_path);
+		NtOpenFile(&codepage_file,FILE_READ_DATA,&oa,&ios,FILE_SHARE_READ,0);
+		oa.hRootDirectory=root_obj;
+		oa.uAttributes|=OBJ_OPENIF;
+		RtlInitUnicodeString(&us,L"JPN_CodePage");	
+		NtCreateSection(&codepage_section,SECTION_MAP_READ,&oa,0,PAGE_READONLY,SEC_COMMIT,codepage_file);
+		NtClose(codepage_file); 
+		size=0;
+		NtMapViewOfSection(codepage_section,NtCurrentProcess(),&page,0,0,0,&size,ViewUnmap,0,PAGE_READONLY);
 	}
 	wcscpy(file_path+4,GetModulePath());
 	current_dir=wcsrchr(file_path,L'\\')+1;

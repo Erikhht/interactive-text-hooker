@@ -11,6 +11,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ITH_engine", "ITH_engine\IT
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ITH_SYS", "ITH_SYS\ITH_SYS.vcxproj", "{EE4B5DD7-9DC2-4425-BB12-3B9E10981A00}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "version", "version\version.vcxproj", "{22F1F2CE-C54C-400E-A8CE-615A80C01589}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -55,6 +57,12 @@ Global
 		{EE4B5DD7-9DC2-4425-BB12-3B9E10981A00}.Release|Win32.ActiveCfg = Release|Win32
 		{EE4B5DD7-9DC2-4425-BB12-3B9E10981A00}.Release|Win32.Build.0 = Release|Win32
 		{EE4B5DD7-9DC2-4425-BB12-3B9E10981A00}.Release|x64.ActiveCfg = Release|Win32
+		{22F1F2CE-C54C-400E-A8CE-615A80C01589}.Debug|Win32.ActiveCfg = Debug|Win32
+		{22F1F2CE-C54C-400E-A8CE-615A80C01589}.Debug|Win32.Build.0 = Debug|Win32
+		{22F1F2CE-C54C-400E-A8CE-615A80C01589}.Debug|x64.ActiveCfg = Debug|Win32
+		{22F1F2CE-C54C-400E-A8CE-615A80C01589}.Release|Win32.ActiveCfg = Release|Win32
+		{22F1F2CE-C54C-400E-A8CE-615A80C01589}.Release|Win32.Build.0 = Release|Win32
+		{22F1F2CE-C54C-400E-A8CE-615A80C01589}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

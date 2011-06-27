@@ -18,11 +18,12 @@
 #include "window.h"
 #include "resource.h"
 #include <commctrl.h>
+#include <intrin.h>
 //LPCWSTR ClassName=L"ITH";
 //LPCWSTR ClassNameAdmin=L"ITH (Administrator)";
 LPWSTR import_buffer;
 int import_buffer_len;
-static WNDPROC proc,proccmd;
+static WNDPROC proc,proccmd,procChar;
 static WCHAR last_cmd[CMD_SIZE];
 static CRITICAL_SECTION update_cs;
 
@@ -40,12 +41,13 @@ HookWindow* hkwnd;
 ProcessWindow* pswnd;
 ThreadWindow* thwnd;
 ProfileWindow* pfwnd;
+FilterWindow* ftwnd;
 ThreadParam edit_tp;
 LinkParam edit_lp;
 CommentParam edit_cp;
 #define COMMENT_BUFFER_LENGTH 0x200
 static WCHAR comment_buffer[COMMENT_BUFFER_LENGTH];
-DWORD clipboard_flag,cyclic_remove,repeat_count;
+DWORD clipboard_flag,cyclic_remove,repeat_count,global_filter;
 bool Parse(LPWSTR cmd, HookParam& hp);
 void SaveSettings();
 extern LPVOID DefaultHookAddr[];
@@ -53,6 +55,7 @@ extern LPWSTR EngineHookName[],HookNameInitTable[];
 static int last_select,last_edit;
 typedef BOOL (CALLBACK* EditFun)(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam);
 typedef BOOL (*PostEditFun)(HWND hlEdit, HWND hcmb);
+
 
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
@@ -291,7 +294,10 @@ BOOL CALLBACK OptionDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			CheckDlgButton(hDlg,IDC_CHECK2,auto_insert);
 			CheckDlgButton(hDlg,IDC_CHECK3,clipboard_flag);
 			CheckDlgButton(hDlg,IDC_CHECK4,cyclic_remove);
+			CheckDlgButton(hDlg,IDC_CHECK5,global_filter);
 			hOptionDlg=hDlg;
+			ftwnd=new FilterWindow(hDlg);
+			ftwnd->Init();
 		}
 		return TRUE;
 	case WM_COMMAND:
@@ -327,16 +333,58 @@ BOOL CALLBACK OptionDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					}
 					auto_inject=IsDlgButtonChecked(hDlg,IDC_CHECK1);
 					auto_insert=IsDlgButtonChecked(hDlg,IDC_CHECK2);
-					clipboard_flag=IsDlgButtonChecked(hDlg,IDC_CHECK3)>0;
-					cyclic_remove=IsDlgButtonChecked(hDlg,IDC_CHECK4)>0;
+					clipboard_flag=IsDlgButtonChecked(hDlg,IDC_CHECK3);
+					cyclic_remove=IsDlgButtonChecked(hDlg,IDC_CHECK4);
+					global_filter=IsDlgButtonChecked(hDlg,IDC_CHECK5);
 					if (auto_inject==0) auto_insert=0;
+					ftwnd->SetCommitFlag();
 				}
 			case IDCANCEL:
+				delete ftwnd;
 				EndDialog(hDlg,0);
 				hOptionDlg=0;
+				
+				ftwnd=0;
+				break;
+			case IDC_BUTTON1: //delete
+				ftwnd->DeleteCurrentChar();
+				break;
+			case IDC_BUTTON2: //Set
+				ftwnd->SetCurrentChar();
+				break;
+			case IDC_BUTTON3: //Add
+				ftwnd->AddNewChar();
+				break;
+			case IDC_EDIT8:
+				if (wmEvent==WM_PASTE)
+				{
+					WCHAR uni_char[4];
+					if (GetDlgItemText(hDlg,IDC_EDIT8,uni_char,8)>=1)
+						ftwnd->InitWithChar(uni_char[0]);				
+				}				
 				break;
 			}
 			return TRUE;
+		}
+	case WM_NOTIFY:
+		{
+			LPNMHDR dr=(LPNMHDR)lParam;
+			switch (dr->code)
+			{
+			case NM_CLICK: 
+			case LVN_ITEMCHANGED:
+				if (dr->idFrom==IDC_LIST1)
+				{
+					NMLISTVIEW *nmlv=(LPNMLISTVIEW)lParam;
+					if (nmlv->uNewState==3)
+					{
+						ftwnd->SelectCurrentChar(nmlv->iItem);
+						return TRUE;
+					}
+						//pswnd->RefreshThread(nmlv->iItem);
+				}
+				
+			}
 		}
 	default:
 		return FALSE;
@@ -1197,7 +1245,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				case CBN_SELENDOK:
 					{
 						if (h==hwndProc) return 0;
-						//WCHAR pwcEntry[0x80]={0};
+						//WCHAR pwcEntry[0x80]={};
 						LPWSTR pwcEntry; int len;
 						dwId=SendMessage(hwndCombo,CB_GETCURSEL,0,0);
 						len=SendMessage(hwndCombo,CB_GETLBTEXTLEN,dwId,0);
@@ -1235,11 +1283,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					else if (h==hwndOption)
 					{
 						if (hOptionDlg) SetForegroundWindow(hOptionDlg);
-						else hOptionDlg=CreateDialog(hIns,(LPWSTR)IDD_DIALOG4,0,OptionDlgProc);
+						else 
+						{
+							hOptionDlg=CreateDialog(hIns,(LPWSTR)IDD_DIALOG4,0,OptionDlgProc);
+							ftwnd->ClearGlyphArea();
+						}
 					}
 					else if (h==hwndClear)
 					{
-						WCHAR pwcEntry[0x80]={0};
+						WCHAR pwcEntry[0x80]={};
 						dwId=SendMessage(hwndCombo,CB_GETCURSEL,0,0);
 						int len=SendMessage(hwndCombo,CB_GETLBTEXT,dwId,(LPARAM)pwcEntry);
 						swscanf(pwcEntry,L"%x",&dwId);
@@ -1503,7 +1555,7 @@ void HookWindow::ResetDialog(int index)
 {
 	if (index<0) return;
 	DWORD pid,addr;
-	WCHAR pwcEntry[0x100]={0};
+	WCHAR pwcEntry[0x100]={};
 	int len=SendMessage(hCombo,CB_GETLBTEXT,index,(LPARAM)pwcEntry);
 	swscanf(pwcEntry,L"%d:0x%x",&pid,&addr);
 	man->LockProcessHookman(pid);
@@ -1520,7 +1572,7 @@ void HookWindow::RemoveHook()
 	int k=SendMessage(hCombo,CB_GETCURSEL,0,0);
 	if (k==CB_ERR) return;
 	hRemoved=IthCreateEvent(L"ITH_REMOVE_HOOK");
-	SendParam sp={0};
+	SendParam sp={};
 	sp.type=2;
 	GetWindowText(hCombo,str,0x80);
 	swscanf(str,L"%d:0x%x",&pid,&sp.hp.addr);
@@ -1588,7 +1640,7 @@ void HookWindow::ResetDlgHooks(DWORD pid, HookParam& hp)
 }
 void HookWindow::InitDlg()
 {
-	HookParam hp={0};
+	HookParam hp={};
 	hp.addr=man->GetCurrentThread()->Addr();
 	ResetDlgHooks(man->GetCurrentPID(), hp);
 	ResetDialog(hp);
@@ -1626,7 +1678,7 @@ ProcessWindow::ProcessWindow(HWND hDialog) : hDlg(hDialog)
 }
 void ProcessWindow::InitProcessDlg()
 {
-	LVCOLUMN lvc={0}; 
+	LVCOLUMN lvc={}; 
 	lvc.mask = LVCF_FMT | LVCF_TEXT | LVCF_WIDTH; 
 	lvc.fmt = LVCFMT_RIGHT;  // left-aligned column
 	lvc.cx = 40;
@@ -1659,7 +1711,7 @@ void ProcessWindow::RefreshProcess()
 { 
 	ListView_DeleteAllItems(hlProcess);
 	ListView_DeleteAllItems(hlThread);
-	LVITEM item={0};
+	LVITEM item={};
 	item.mask = LVIF_TEXT | LVIF_PARAM | LVIF_STATE; 
 	MyStack<HANDLE,0x100> stk;
 	BYTE *pbBuffer=GetSystemInformation();
@@ -1669,7 +1721,7 @@ void ProcessWindow::RefreshProcess()
 	DWORD ws,size,flag64,wow64;
 	if (!NT_SUCCESS(NtQueryInformationProcess(NtCurrentProcess(),ProcessWow64Information,&flag64,4,0)))
 		flag64=0;
-	OBJECT_ATTRIBUTES attr={0};
+	OBJECT_ATTRIBUTES attr={};
 	CLIENT_ID id;
 	WCHAR pwcBuffer[0x100];
 	attr.uLength=sizeof(attr);
@@ -1711,7 +1763,7 @@ void ProcessWindow::RefreshProcess()
 }
 void ProcessWindow::AttachProcess()
 {			
-	LVITEM item={0};
+	LVITEM item={};
 	item.mask=LVIF_PARAM;
 	item.iItem=ListView_GetSelectionMark(hlProcess);
 	ListView_GetItem(hlProcess,&item);
@@ -1749,7 +1801,7 @@ void ProcessWindow::OperateThread()
 	for (i=0; i<3&&IsDlgButtonChecked(hDlg,IDC_RADIO1+i)==BST_UNCHECKED; i++);
 	if (i==3) return;
 	ThreadOperation op=(ThreadOperation)i;
-	LVITEM item={0};
+	LVITEM item={};
 	item.mask=LVIF_PARAM;
 	item.iItem=ListView_GetSelectionMark(hlProcess);
 	ListView_GetItem(hlProcess,&item);
@@ -1770,7 +1822,7 @@ void ProcessWindow::OperateThread()
 	}
 	else
 	{
-		LVITEM item={0};
+		LVITEM item={};
 		item.mask=LVIF_PARAM;
 		item.iItem=ListView_GetSelectionMark(hlThread);
 		if (item.iItem==-1) return;
@@ -1781,7 +1833,7 @@ void ProcessWindow::OperateThread()
 }
 void ProcessWindow::AddCurrentToProfile()
 {
-	LVITEM item={0};
+	LVITEM item={};
 	item.mask=LVIF_PARAM;
 	item.iItem=ListView_GetSelectionMark(hlProcess);
 	ListView_GetItem(hlProcess,&item);
@@ -1806,7 +1858,7 @@ void ProcessWindow::AddCurrentToProfile()
 void ProcessWindow::RefreshThread(int index)
 {
 	WCHAR path[MAX_PATH];
-	LVITEM item={0};
+	LVITEM item={};
 	item.mask=LVIF_PARAM;
 	item.iItem=index;
 	ListView_GetItem(hlProcess,&item);
@@ -1852,7 +1904,7 @@ bool ProcessWindow::PerformThread(DWORD pid, DWORD tid, ThreadOperation op, DWOR
 	HANDLE hThread,hProc;
 	CLIENT_ID id;
 	NTSTATUS status;
-	OBJECT_ATTRIBUTES att={0};
+	OBJECT_ATTRIBUTES att={};
 	att.uLength=sizeof(att);
 	id.UniqueProcess=pid;
 	id.UniqueThread=tid;
@@ -1877,7 +1929,7 @@ bool ProcessWindow::PerformThread(DWORD pid, DWORD tid, ThreadOperation op, DWOR
 		{
 		case OutputInformation:
 		{
-			LVITEM item={0};
+			LVITEM item={};
 			item.mask = LVIF_TEXT | LVIF_PARAM | LVIF_STATE; 
 
 			WCHAR name[0x100],str[0x100];
@@ -1915,7 +1967,7 @@ bool ProcessWindow::PerformThread(DWORD pid, DWORD tid, ThreadOperation op, DWOR
 }
 DWORD ProcessWindow::GetSelectPID()
 {
-	LVITEM item={0};
+	LVITEM item={};
 	item.mask=LVIF_PARAM;
 	item.iItem=ListView_GetSelectionMark(hlProcess);
 	ListView_GetItem(hlProcess,&item);
@@ -2202,7 +2254,7 @@ ProfileWindow::ProfileWindow(HWND hDialog)
 	hbDelete=GetDlgItem(hDlg,IDC_BUTTON2);
 	hbSave=GetDlgItem(hDlg,IDC_BUTTON3);
 	ListView_SetExtendedListViewStyleEx(hlProfileList,LVS_EX_FULLROWSELECT,LVS_EX_FULLROWSELECT);
-	LVCOLUMN lvc={0}; 
+	LVCOLUMN lvc={}; 
 	lvc.mask = LVCF_FMT | LVCF_TEXT | LVCF_WIDTH; 
 	lvc.fmt = LVCFMT_RIGHT;  // left-aligned column
 	lvc.cx = 30;
@@ -2224,7 +2276,7 @@ void ProfileWindow::RefreshProfileList()
 	if (hEditProfileDlg) EndDialog(hEditProfileDlg,0);
 	ProfileNode* it=pfman->BeginProfile();
 	LPWSTR name; WCHAR buff[0x20];
-	LVITEM item={0};
+	LVITEM item={};
 	item.mask = LVIF_TEXT | LVIF_STATE | LVIF_PARAM; 
 	for (int i=0;it;i++)
 	{
@@ -2247,7 +2299,7 @@ void ProfileWindow::RefreshProfileList()
 }
 void ProfileWindow::ResetProfile(int index)
 {
-	LVITEM item={0};
+	LVITEM item={};
 	item.mask=LVIF_PARAM;
 	item.iItem=index;
 	ListView_GetItem(hlProfileList,&item);
@@ -2336,7 +2388,7 @@ void ProfileWindow::StartProfileProcess()
 {
 	int index=ListView_GetSelectionMark(hlProfileList);
 	if (index==-1) return;
-	LVITEM item={0};
+	LVITEM item={};
 	item.mask=LVIF_PARAM;
 	item.iItem=index;
 	ListView_GetItem(hlProfileList,&item);
@@ -2627,7 +2679,7 @@ Profile* ProfileWindow::GetCurrentProfile()
 DWORD ProfileWindow::GetCurrentSelect()
 {
 	int index=ListView_GetSelectionMark(hlProfileList);
-	LVITEM item={0};
+	LVITEM item={};
 	item.mask=LVIF_PARAM;
 	item.iItem=index;
 	ListView_GetItem(hlProfileList,&item);
@@ -2641,3 +2693,469 @@ DWORD WINAPI UpdateWindows(LPVOID lpThreadParameter)
 	LeaveCriticalSection(&update_cs);
 	return 0;
 }
+
+class IthGlyph
+{
+public:
+	IthGlyph(HDC hdc):hDC(hdc), glyph_buffer(0), hBmp(0)
+	{
+		hMemDC=CreateCompatibleDC(hdc);
+	}
+	~IthGlyph()
+	{
+		if (hBmp) DeleteObject(hBmp);
+		if (hMemDC) DeleteDC(hMemDC);
+		if (glyph_buffer) delete glyph_buffer;
+		glyph_buffer=0;
+		glyph_char=0;
+		hMemDC=0;
+		hBmp=0;
+		hDC=0;
+	}
+	int InitGlyph(wchar_t ch)
+	{
+		DWORD len,i,ii,j,k,t;
+		BYTE *buffer,*bptr;
+		LPVOID ptr;
+		MAT2 mt={};
+		glyph_char=ch;
+		mt.eM11.value=1;
+		mt.eM22.value=-1;
+
+		len=GetGlyphOutline(hDC,ch,GGO_GRAY8_BITMAP,&gm,0,0,&mt);
+		if (len<=0) return -1;
+		glyph_buffer=new BYTE[len];
+		len=GetGlyphOutline(hDC,ch,GGO_GRAY8_BITMAP,&gm,len,glyph_buffer,&mt);
+		if (len==-1) return -1;	
+		BITMAPINFOHEADER info={sizeof(info),gm.gmBlackBoxX,gm.gmBlackBoxY,1,32,BI_RGB,0,0,0,0,0};
+		hBmp=CreateDIBSection(hMemDC,(BITMAPINFO*)&info,DIB_RGB_COLORS,&ptr,0,0);
+		buffer=(BYTE*)ptr;
+		bptr=glyph_buffer;
+		k=(gm.gmBlackBoxX+3)&~3;t=0;ii=0;
+		for (i=0;i<gm.gmBlackBoxY;i++)
+		{
+			for (j=0;j<gm.gmBlackBoxX;j++)
+			{
+				bptr[j]=64-bptr[j];
+				if (bptr[j]) 
+					buffer[0]=buffer[1]=buffer[2]=(bptr[j]<<2)-1;
+				buffer+=4;
+			}
+			bptr+=k;
+		}
+		SelectObject(hMemDC,hBmp);
+		return 0;
+	}
+	int DrawGlyph(HDC hdc, int x, int y, int height)
+	{
+		if (glyph_buffer==0) return -1;
+		return BitBlt(hdc, x+gm.gmptGlyphOrigin.x, y+height-gm.gmBlackBoxY+gm.gmptGlyphOrigin.y, 
+			gm.gmBlackBoxX, gm.gmBlackBoxY, hMemDC, 0, 0, SRCCOPY);
+	}
+private:
+	HDC hDC, hMemDC;
+	HBITMAP hBmp;
+	UINT glyph_char;
+	GLYPHMETRICS gm;
+	BYTE* glyph_buffer;
+};
+
+LRESULT CALLBACK EditCharProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	switch (message)
+	{
+	case WM_PASTE:
+		{
+			HGLOBAL   hglb; 
+			LPWSTR    lpwstr; 
+
+			if (!IsClipboardFormatAvailable(CF_UNICODETEXT)) break;
+			if (!OpenClipboard(0)) break;
+			hglb = GetClipboardData(CF_UNICODETEXT); 
+			if (hglb != NULL) 
+			{ 
+				lpwstr = (LPWSTR)GlobalLock(hglb); 
+				if (lpwstr != NULL) 
+				{ 
+					// Call the application-defined ReplaceSelection 
+					// function to insert the text and repaint the 
+					// window. 
+					ftwnd->InitWithChar(lpwstr[0]);
+					GlobalUnlock(hglb); 
+				} 
+			} 
+			CloseClipboard(); 
+			return 0;
+		}
+	case WM_CHAR:
+		if (wParam>=0x20)
+		{
+			ftwnd->InitWithChar(wParam);
+			return 0;
+		}
+	default:
+		break;
+	}
+	return CallWindowProc(procChar,hWnd,message,wParam,lParam);
+}
+void InsertUniChar(WORD uni_char)
+{
+	ftwnd->SetUniChar(uni_char);
+}
+void InsertMBChar(WORD mb_char)
+{
+	ftwnd->SetMBChar(mb_char);
+}
+FilterWindow::FilterWindow(HWND hDialog)
+{
+	modify=remove=commit=0;
+	hDlg=hDialog;
+	hList=GetDlgItem(hDlg,IDC_LIST1);
+	hGlyph=GetDlgItem(hDlg,IDC_STATIC1);
+	hSJIS=GetDlgItem(hDlg,IDC_EDIT6);
+	hUnicode=GetDlgItem(hDlg,IDC_EDIT7);
+	hChar=GetDlgItem(hDlg,IDC_EDIT8);
+	procChar=(WNDPROC)SetWindowLongPtr(hChar,GWL_WNDPROC,(LONG_PTR)EditCharProc);
+	ListView_SetExtendedListViewStyleEx(hList,LVS_EX_FULLROWSELECT,LVS_EX_FULLROWSELECT);
+	ListView_DeleteAllItems(hList);
+	LVCOLUMN lvc={}; 
+	lvc.mask = LVCF_FMT | LVCF_TEXT | LVCF_WIDTH; 
+	lvc.fmt = LVCFMT_LEFT;  // left-aligned column
+	lvc.cx = 35;
+	lvc.pszText = L"Char";	
+	ListView_InsertColumn(hList, 0, &lvc);
+	lvc.cx = 50;
+	lvc.pszText = L"SJIS";	
+	ListView_InsertColumn(hList, 1, &lvc);
+	lvc.cx = 100;
+	lvc.fmt = LVCFMT_LEFT;  // left-aligned column
+	lvc.pszText = L"Unicode";	
+	ListView_InsertColumn(hList, 2, &lvc);
+
+	hGlyphFont=CreateFont( 64, 0, 0, 0, FW_THIN, FALSE, FALSE, FALSE, SHIFTJIS_CHARSET, OUT_DEFAULT_PRECIS, 
+		CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"MS Mincho" );
+	hGlyphDC=GetDC(hGlyph);
+	SelectObject(hGlyphDC,hGlyphFont);
+	white=CreateSolidBrush(RGB(0xFF,0xFF,0xFF));
+	GetTextMetrics(hGlyphDC,&tm);
+	GetClientRect(hGlyph,&rc);
+	init_x=(rc.right-tm.tmMaxCharWidth)/2;
+	init_y=0;
+}
+FilterWindow::~FilterWindow()
+{
+	WCHAR buffer[8];
+	WCHAR filter_unichar[2];
+	char filter_mbchar[4];
+	ReleaseDC(hGlyph,hGlyphDC);
+	DeleteObject(white);
+	DeleteObject(hGlyphFont);
+	if (uni_filter&&mb_filter&&commit)
+	{
+		if (modify)
+		{
+			LVITEM item={};
+			LVITEM sub={};
+			int i,count=ListView_GetItemCount(hList);
+			item.mask=LVIF_TEXT;
+			item.cchTextMax=2;
+			item.pszText=filter_unichar;
+			sub.mask=LVIF_TEXT;
+			sub.cchTextMax=8;
+			sub.pszText=buffer;
+			if (remove)
+			{
+				uni_filter->Reset();
+				mb_filter->Reset();
+				for (i=0;i<count;i++)
+				{
+					item.iItem=i;
+					ListView_GetItem(hList,&item);
+					filter_unichar[1]=0;
+					WC_MB(filter_unichar,filter_mbchar);
+					sub.iSubItem=1;
+					SendMessage(hList, LVM_GETITEMTEXT, (WPARAM)(i), (LPARAM)(LV_ITEM *)&sub);
+					if (buffer[4]==L'+') uni_filter->Set(filter_unichar[0]);
+					sub.iSubItem=2;
+					SendMessage(hList, LVM_GETITEMTEXT, (WPARAM)(i), (LPARAM)(LV_ITEM *)&sub);
+					if (buffer[4]==L'+') mb_filter->Set(*(WORD*)filter_mbchar);
+				}
+			}
+			else
+			{
+				for (i=0;i<count;i++)
+				{
+					item.iItem=i;
+					ListView_GetItem(hList,&item);
+					filter_unichar[1]=0;
+					WC_MB(filter_unichar,filter_mbchar);
+					sub.iSubItem=1;
+					SendMessage(hList, LVM_GETITEMTEXT, (WPARAM)(i), (LPARAM)(LV_ITEM *)&sub);
+					if (buffer[4]==L'+') uni_filter->Set(filter_unichar[0]);
+					else uni_filter->Clear(filter_unichar[0]);
+					sub.iSubItem=2;
+					SendMessage(hList, LVM_GETITEMTEXT, (WPARAM)(i), (LPARAM)(LV_ITEM *)&sub);
+					if (buffer[4]==L'+') mb_filter->Set(*(WORD*)filter_mbchar);
+					else mb_filter->Clear(*(WORD*)filter_mbchar);
+				}
+			}
+		}
+	}
+}
+void FilterWindow::Init()
+{
+	WCHAR uni_char[8],buffer[8];
+	union {DWORD mbd;WORD mbw[2];char mbc[4];BYTE mbb[4];};
+	uni_filter->Traverse(InsertUniChar);
+	mb_filter->Traverse(InsertMBChar);
+	DWORD count,index;
+	LVITEM item={};
+	item.mask=LVIF_TEXT;
+	item.cchTextMax=8;
+	item.pszText=buffer;
+	mbd=0;
+	count=ListView_GetItemCount(hList);
+	for (index=0;index<count;index++)
+	{
+		ListView_GetItemText(hList,index,0,uni_char,8);
+		item.iSubItem=1;
+		if (SendMessage(hList,LVM_GETITEMTEXT,index,(LPARAM)&item)==0)
+		{
+			WC_MB(uni_char,mbc);
+			mbw[0]=_rotl16(mbw[0],(LeadByteTable[mbb[0]]-1)<<3);
+			swprintf(buffer,L"%.4X-",mbd);
+			SendMessage(hList,LVM_SETITEMTEXT,index,(LPARAM)&item);
+		}
+		else
+		{
+			item.iSubItem=2;
+			if (SendMessage(hList,LVM_GETITEMTEXT,index,(LPARAM)&item)==0)
+			{
+				swprintf(buffer,L"%.4X-",uni_char[0]);
+				SendMessage(hList,LVM_SETITEMTEXT,index,(LPARAM)&item);
+			}
+		}
+
+	}
+}
+void FilterWindow::DeleteCurrentChar()
+{
+	WCHAR buffer[4];
+	DWORD index=ListView_GetSelectionMark(hList);
+	if (-1==index) 
+	{
+		MessageBox(0,L"Select one item first.",0,0);
+		return;
+	}
+	ListView_DeleteItem(hList,index);
+	buffer[0]=0;
+	SetWindowText(hSJIS,buffer);
+	SetWindowText(hUnicode,buffer);
+	FillRect(hGlyphDC,&rc,white);
+	remove=1;modify=1;
+}
+void FilterWindow::AddNewChar()
+{
+	WCHAR buffer[8];
+	DWORD uni,index;
+	if (GetWindowText(hChar,buffer,8)==0)
+	{
+		MessageBox(0,L"No character.",0,0);
+		return;
+	}
+	uni=buffer[0];
+	LVFINDINFO find={LVFI_STRING,buffer};
+	index=ListView_FindItem(hList,0,&find);
+	if (index!=-1)
+	{
+		ListView_SetSelectionMark(hList,index);
+		SetCurrentChar();
+		return;
+	}
+	LVITEM item={};
+	item.mask=LVIF_TEXT;
+	item.cchTextMax=2;
+	item.pszText=buffer;
+	index=ListView_InsertItem(hList,&item);
+	if (-1==index) return;
+	item.iItem=index;
+	GetWindowText(hSJIS,buffer,8);
+	if (IsSJISCheck()) buffer[4]=L'+';
+	else buffer[4]=L'-';
+	buffer[5]=0;
+	ListView_SetItemText(hList,index,1,buffer);
+	GetWindowText(hUnicode,buffer,8);
+	if (IsUnicodeCheck()) buffer[4]=L'+';
+	else buffer[4]=L'-';
+	buffer[5]=0;
+	ListView_SetItemText(hList,index,2,buffer);
+	modify=1;
+}
+void FilterWindow::SetCurrentChar()
+{
+	WCHAR buffer[8];
+	DWORD unichar,index,index_duplicate,flag_uni,flag_mb;
+	GetWindowText(hChar,buffer,8);
+	unichar=buffer[0];	
+	index=ListView_GetSelectionMark(hList);
+	if (-1==index) 
+	{
+		MessageBox(0,L"Select one item first.",0,0);
+		return;
+	}
+	LVFINDINFO find={LVFI_STRING,buffer};
+	index_duplicate=ListView_FindItem(hList,0,&find);
+	LV_ITEM item={};
+	if (index_duplicate!=-1)
+	{
+		if (index!=index_duplicate)
+		{
+			DeleteCurrentChar();
+			if (index<index_duplicate) index_duplicate--;
+			index=index_duplicate;
+		}
+
+	}
+	modify=1;
+	item.pszText=buffer+4;
+	item.cchTextMax=8;
+	SendMessage(hList,LVM_GETITEMTEXT,index,(LPARAM)&item);
+	if (buffer[0]!=buffer[4]) remove=1;
+
+	item.pszText=buffer;
+	SendMessage(hList,LVM_SETITEMTEXT,index,(LPARAM)&item);
+
+	GetWindowText(hUnicode,buffer,8);
+	flag_uni=IsUnicodeCheck();
+	if (flag_uni) buffer[4]=L'+';
+	else buffer[4]=L'-';
+	buffer[5]=0;
+	item.iSubItem=2;
+	SendMessage(hList,LVM_SETITEMTEXT,index,(LPARAM)&item);
+	//ListView_SetItemText(hList,index,2,buffer);
+
+	GetWindowText(hSJIS,buffer,8);
+	flag_mb=IsSJISCheck();
+	if (flag_mb) buffer[4]=L'+';
+	else buffer[4]=L'-';
+	buffer[5]=0;
+	item.iSubItem=1;
+	SendMessage(hList,LVM_SETITEMTEXT,index,(LPARAM)&item);
+	//ListView_SetItemText(hList,index,1,buffer);
+	if ((flag_mb|flag_uni)==0)
+	{
+		ListView_SetSelectionMark(hList,index);
+		DeleteCurrentChar();
+	}
+}
+void FilterWindow::SelectCurrentChar(DWORD index)
+{
+	WCHAR buffer[8],uni_char;
+	LVITEM item={};
+	item.mask=LVIF_TEXT;
+	item.cchTextMax=8;
+	item.pszText=buffer;
+	if (SendMessage(hList,LVM_GETITEMTEXT,index,(LPARAM)&item)==1)
+	{
+		uni_char=buffer[0];
+		DrawGlyph(uni_char);
+		item.iSubItem=1;
+		SetWindowText(hChar,buffer);
+		if (SendMessage(hList,LVM_GETITEMTEXT,index,(LPARAM)&item)==5)
+		{
+			if (buffer[4]==L'+') CheckDlgButton(hDlg,IDC_CHECK6,BST_CHECKED);
+			else CheckDlgButton(hDlg,IDC_CHECK6,BST_UNCHECKED);
+			buffer[4]=0;
+			SetWindowText(hSJIS,buffer);
+		}
+		item.iSubItem=2;
+		if (SendMessage(hList,LVM_GETITEMTEXT,index,(LPARAM)&item)==5)
+		{
+			if (buffer[4]==L'+') CheckDlgButton(hDlg,IDC_CHECK7,BST_CHECKED);
+			else CheckDlgButton(hDlg,IDC_CHECK7,BST_UNCHECKED);
+			buffer[4]=0;
+			SetWindowText(hUnicode,buffer);
+		}
+	}
+
+}
+void FilterWindow::InitWithChar(WCHAR uni_char)
+{
+	WCHAR buffer[8];
+	union {DWORD mbd;WORD mbw[2];char mbc[4];BYTE mbb[4];};
+	mbd=0;
+	DrawGlyph(uni_char);
+	buffer[0]=uni_char;
+	buffer[1]=0;
+	SetWindowText(hChar,buffer);
+	WC_MB(buffer,mbc);
+
+	if (LeadByteTable[mbb[0]]==2) mbw[0]=_byteswap_ushort(mbw[0]);
+	swprintf(buffer,L"%.4X",mbw[0]);
+	SetWindowText(hSJIS,buffer);
+	CheckDlgButton(hDlg,IDC_CHECK6,BST_CHECKED);
+
+	swprintf(buffer,L"%.4X",uni_char);
+	SetWindowText(hUnicode,buffer);
+	CheckDlgButton(hDlg,IDC_CHECK7,BST_CHECKED);
+}
+void FilterWindow::DrawGlyph(WCHAR glyph)
+{
+	RECT rc;
+	GetClientRect(hGlyph,&rc);
+	FillRect(hGlyphDC,&rc,white);
+	IthGlyph g(hGlyphDC);
+	g.InitGlyph(glyph);
+	g.DrawGlyph(hGlyphDC,init_x,init_y,tm.tmHeight);
+}
+void FilterWindow::SetUniChar(WCHAR uni_char)
+{
+	WCHAR buffer[8];
+	DWORD index;
+	buffer[0]=uni_char;
+	buffer[1]=0;
+	LVFINDINFO find={LVFI_STRING,buffer};
+	index=ListView_FindItem(hList,0,&find);
+	if (index==-1) 
+	{
+		LVITEM item={};
+		item.mask=LVIF_TEXT;
+		item.cchTextMax=2;
+		item.pszText=buffer;
+		index=ListView_InsertItem(hList,&item);
+		if (-1==index) return;
+	}
+	swprintf(buffer,L"%.4X+",uni_char);
+	ListView_SetItemText(hList,index,2,buffer);
+}
+void FilterWindow::SetMBChar(WORD mb_char)
+{
+	WCHAR buffer[8];
+	char mb[4]={};
+	DWORD index;
+	*(WORD*)mb=mb_char;
+	MB_WC(mb,buffer);
+	buffer[1]=0;
+	LVFINDINFO find={LVFI_STRING,buffer};
+	index=ListView_FindItem(hList,-1,&find);
+	if (index==-1) 
+	{
+		LVITEM item={};
+		item.mask=LVIF_TEXT;
+		item.cchTextMax=2;
+		item.pszText=buffer;
+		index=ListView_InsertItem(hList,&item);
+		if (-1==index) return;
+	}
+	if (LeadByteTable[(BYTE)mb[0]]==2) 
+		mb_char=_byteswap_ushort(mb_char);
+	swprintf(buffer,L"%.4X+",mb_char);
+	ListView_SetItemText(hList,index,1,buffer);
+}
+void FilterWindow::SetCommitFlag() {commit=1;}
+void FilterWindow::ClearGlyphArea()
+{
+	FillRect(hGlyphDC,&rc,white);
+}
+UINT FilterWindow::IsSJISCheck(){ return IsDlgButtonChecked(hDlg,IDC_CHECK6);}
+UINT FilterWindow::IsUnicodeCheck(){ return IsDlgButtonChecked(hDlg,IDC_CHECK7);}

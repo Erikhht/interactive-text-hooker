@@ -37,18 +37,10 @@ BYTE* Filter(BYTE *str, int len)
 		s=*(WORD*)str;
 		if (len>=2)
 		{
-			if (str[0]==0x81){
-				if (str[1]==0x40||((str[1]-2)>>4)==0xA) {str+=2;len-=2;}
-				else break;
-			}
-			else if (str[1]==0x25){
-				if ((str[0]>>4)==0xB) {str+=2;len-=2;}
-				else break;
-			}
-			else if (s==0x3000||s<=0x20) {str+=2;len-=2;}
+			if (s==0x4081||s==0x3000||s<=0x20) {str+=2;len-=2;}
 			else break;
 		}
-		else if ((s&0xFF)<=0x20) {str++;len--;}
+		else if (str[0]<=0x20) {str++;len--;}
 		else break;
 	}
 	return str;
@@ -174,10 +166,10 @@ DWORD WINAPI RecvThread(LPVOID lpThreadParameter)
 	DetachFromProcess(pid);
 	man->UnRegisterProcess(pid);
 	NtClearEvent(hDetachEvent);
-	LeaveCriticalSection(&detach_cs);
-	swprintf((LPWSTR)buff,FormatDetach,pid);
+	LeaveCriticalSection(&detach_cs);	
 	if (running)
 	{
+		swprintf((LPWSTR)buff,FormatDetach,pid);
 		ConsoleOutput((LPWSTR)buff);
 		NtClose(IthCreateThread(UpdateWindows,0));
 	}
@@ -214,12 +206,17 @@ void CommandQueue::AddRequest(const SendParam& sp, DWORD pid)
 	else 
 	{
 		pid=man->GetCurrentPID();
-		if (pid) pid_associate[current++]=pid;
-		else ConsoleOutput(ErrorNoAttach);
+		if (pid) pid_associate[current++]=pid;	
+		else 
+		{
+			ConsoleOutput(ErrorNoAttach);
+			goto _request_exit;
+		}
 	}
 	current&=(QUEUE_MAX-1);
-	LeaveCriticalSection(&rw);
 	NtReleaseSemaphore(hSemaphore,1,0);
+_request_exit:
+	LeaveCriticalSection(&rw);
 }
 void CommandQueue::SendCommand()
 {

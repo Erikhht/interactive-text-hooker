@@ -26,15 +26,17 @@ static WCHAR exist[]=L"ITH_PIPE_EXIST";
 static WCHAR mutex[]=L"ITH_RUNNING";
 extern LPCWSTR ClassName,ClassNameAdmin;
 HINSTANCE hIns;
-TextBuffer			*texts;
+TextBuffer		*texts;
 HookManager		*man;
-ProfileManager		*pfman;
+ProfileManager	*pfman;
 CommandQueue	*cmdq;
-BitMap					*pid_map;
+BitMap			*pid_map;
+CustomFilterMultiByte *mb_filter;
+CustomFilterUnicode *uni_filter;
 BYTE* static_large_buffer;
 HANDLE hPipeExist;
 RECT window;
-bool	running=true,admin=false;
+bool running=true,admin=false;
 ATOM MyRegisterClass(HINSTANCE hInstance);
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow, RECT *rc);
 
@@ -61,61 +63,158 @@ void GetDebugPriv(void)
 
 	NtClose(hToken);
 }
-char* setting_string[]={"split_time","process_time","inject_delay","insert_delay",
-	"auto_inject",	"auto_insert","auto_copy","auto_suppress",
-	"window_left","window_right","window_top","window_bottom"};
+wchar_t* setting_string[]={L"split_time",L"process_time",L"inject_delay",L"insert_delay",
+	L"auto_inject",L"auto_insert",L"auto_copy",L"auto_suppress", L"global_filter",
+	L"window_left",L"window_right",L"window_top",L"window_bottom"};
 DWORD window_left,window_right,window_top,window_bottom;
 DWORD* setting_variable[]={&split_time,&process_time,&inject_delay,&insert_delay,
-	&auto_inject,&auto_insert,&clipboard_flag,&cyclic_remove,
+	&auto_inject,&auto_insert,&clipboard_flag,&cyclic_remove,&global_filter,
 	&window_left,&window_right,&window_top,&window_bottom};
-DWORD default_setting[]={200,50,3000,500,1,1,0,0,100,800,100,600};
+DWORD default_setting[]={200,50,3000,500,1,1,0,0,0,100,800,100,600};
+MyVector<wchar_t,0x1000>* settings;
+void RecordUniChar(WORD uni_char)
+{
+	char mb[4];
+	wchar_t uni[0x10]={uni_char,0};
+	int mask=2;
+	WC_MB(uni,mb);
+	if (mb_filter->Check(*(WORD*)mb)) 
+	{
+		mask|=1;
+		mb_filter->Clear(*(WORD*)mb);
+	}
+	mask=swprintf(uni,L"%.4x,%d,%c\r\n",uni_char,mask,uni_char);
+	settings->AddToStore(uni,mask);
+}
+void RecordMultiByte(WORD mb_char)
+{
+	wchar_t buffer[0x10];
+	char mb[4];
+	*(WORD*)mb=mb_char;
+	mb[2]=0;
+	MB_WC(mb,buffer);
+
+	int i=swprintf(buffer,L"%.4x,1,%c\r\n",buffer[0],buffer[0]);
+	settings->AddToStore(buffer,i);
+}
 void SaveSettings()
 {
-	HANDLE hFile=IthCreateFile(L"ITH.ini",GENERIC_WRITE,FILE_SHARE_READ,FILE_OVERWRITE_IF);
+	HANDLE hFile=IthCreateFile(L"ITH.ini",FILE_WRITE_DATA,FILE_SHARE_READ,FILE_OVERWRITE_IF);
 	if (hFile!=INVALID_HANDLE_VALUE)
 	{
-		char* buffer=new char[0x1000];
-		char* ptr=buffer;
+		wchar_t buffer[0x100];
+		int i=0;
 		IO_STATUS_BLOCK ios;
-		ptr+=sprintf(ptr,"split_time=%d\r\n",split_time);
-		ptr+=sprintf(ptr,"process_time=%d\r\n",process_time);
-		ptr+=sprintf(ptr,"inject_delay=%d\r\n",inject_delay);
-		ptr+=sprintf(ptr,"insert_delay=%d\r\n",insert_delay);
-		ptr+=sprintf(ptr,"auto_inject=%d\r\n",auto_inject);
-		ptr+=sprintf(ptr,"auto_insert=%d\r\n",auto_insert);
-		ptr+=sprintf(ptr,"auto_copy=%d\r\n",clipboard_flag);
-		ptr+=sprintf(ptr,"auto_suppress=%d\r\n",cyclic_remove);
+		settings=new MyVector<wchar_t,0x1000> ;
+		buffer[0]=0xFEFF;
+		settings->AddToStore(buffer,1);
+		i=swprintf(buffer,L"split_time=%d\r\n",split_time);
+		settings->AddToStore(buffer,i);
+		i=swprintf(buffer,L"split_time=%d\r\n",split_time);
+		settings->AddToStore(buffer,i);
+		i=swprintf(buffer,L"process_time=%d\r\n",process_time);
+		settings->AddToStore(buffer,i);
+		i=swprintf(buffer,L"inject_delay=%d\r\n",inject_delay);
+		settings->AddToStore(buffer,i);
+		i=swprintf(buffer,L"insert_delay=%d\r\n",insert_delay);
+		settings->AddToStore(buffer,i);
+		i=swprintf(buffer,L"auto_inject=%d\r\n",auto_inject);
+		settings->AddToStore(buffer,i);
+		i=swprintf(buffer,L"auto_insert=%d\r\n",auto_insert);
+		settings->AddToStore(buffer,i);
+		i=swprintf(buffer,L"auto_copy=%d\r\n",clipboard_flag);
+		settings->AddToStore(buffer,i);
+		i=swprintf(buffer,L"auto_suppress=%d\r\n",cyclic_remove);
+		settings->AddToStore(buffer,i);
+		i=swprintf(buffer,L"global_filter=%d\r\n",global_filter);
+		settings->AddToStore(buffer,i);
 		RECT rc;
 		if (IsWindow(hMainWnd))
 		{
 			GetWindowRect(hMainWnd,&rc);
-			ptr+=sprintf(ptr,"window_left=%d\r\n",rc.left);
-			ptr+=sprintf(ptr,"window_right=%d\r\n",rc.right);
-			ptr+=sprintf(ptr,"window_top=%d\r\n",rc.top);
-			ptr+=sprintf(ptr,"window_bottom=%d\r\n",rc.bottom);
+			i=swprintf(buffer,L"window_left=%d\r\n",rc.left);
+			settings->AddToStore(buffer,i);
+			i=swprintf(buffer,L"window_right=%d\r\n",rc.right);
+			settings->AddToStore(buffer,i);
+			i=swprintf(buffer,L"window_top=%d\r\n",rc.top);
+			settings->AddToStore(buffer,i);
+			i=swprintf(buffer,L"window_bottom=%d\r\n",rc.bottom);
+			settings->AddToStore(buffer,i);
 		}
-		NtWriteFile(hFile,0,0,0,&ios,buffer,ptr-buffer+1,0,0);
-		delete buffer;
+		i=swprintf(buffer,L"CF={\r\n");
+		settings->AddToStore(buffer,i);
+		uni_filter->Traverse(RecordUniChar);
+		mb_filter->Traverse(RecordMultiByte);
+		settings->AddToStore(L"}\r\n",3);
+		NtWriteFile(hFile,0,0,0,&ios,settings->Storage(),settings->Used()<<1,0,0);
 		NtClose(hFile);
+		delete settings;
 	}
 }
 void LoadSettings()
 {
-	HANDLE hFile=IthCreateFile(L"ITH.ini",GENERIC_READ,FILE_SHARE_READ,FILE_OPEN);
+	HANDLE hFile=IthCreateFile(L"ITH.ini",FILE_READ_DATA,FILE_SHARE_READ,FILE_OPEN);
 	if (hFile!=INVALID_HANDLE_VALUE)
 	{
 		IO_STATUS_BLOCK ios;
 		FILE_STANDARD_INFORMATION info;
+		LPVOID vm_buffer=0;
 		NtQueryInformationFile(hFile,&ios,&info,sizeof(info),FileStandardInformation);
-		char* buffer=new char[info.AllocationSize.LowPart];
-		char* ptr;
-		NtReadFile(hFile,0,0,0,&ios,buffer,info.AllocationSize.LowPart,0,0);
-		for (int i=0;i<sizeof(setting_string)/sizeof(char*);i++)
+		NtAllocateVirtualMemory(NtCurrentProcess(),&vm_buffer,0,&info.AllocationSize.LowPart,MEM_COMMIT,PAGE_READWRITE);
+		wchar_t* buffer=(wchar_t*)vm_buffer;
+		wchar_t* ptr,*last_ptr;
+		NtReadFile(hFile,0,0,0,&ios,vm_buffer,info.AllocationSize.LowPart,0,0);
+		if (*(WORD*)vm_buffer!=0xFEFF)
 		{
-			ptr=strstr(buffer,setting_string[i]);
-			if (ptr==0) ptr=buffer;
-			if (sscanf(strchr(ptr,'=')+1,"%d",setting_variable[i])==0) 
+			NtClose(hFile);
+			NtFreeVirtualMemory(NtCurrentProcess(),&vm_buffer,&info.AllocationSize.LowPart,MEM_RELEASE);
+			goto _no_setting;
+		}
+		ptr=buffer;
+		for (int i=0;i<sizeof(setting_string)/sizeof(wchar_t*);i++)
+		{
+			if (ptr==0) ptr=last_ptr;
+			ptr=wcsstr(ptr,setting_string[i]);
+			if (ptr==0||swscanf(wcschr(ptr,'=')+1,L"%d",setting_variable[i])==0) 
 				*setting_variable[i]=default_setting[i];
+			last_ptr=ptr;
+		}
+		buffer[(info.AllocationSize.LowPart>>1)-1]='\n';
+		while (*ptr!=L'\n') ptr++;
+		ptr++;
+		if (ptr-buffer+4<info.AllocationSize.LowPart)
+		{
+			if (*ptr)
+			{
+				if (*(DWORD*)ptr==0x460043&&*(DWORD*)(ptr+2)==0x7B003D) // CF={
+				{
+					ptr+=6;
+					LPWSTR next=ptr,end;
+					DWORD mask;
+					WCHAR uni_char[2];
+					char mb_char[4];
+					for (end=ptr;*end;end++);
+					*end=L'\n';
+					while (next<end)
+					{				
+						ptr=next;
+						while (*next!=L'\n') next++;
+						*next++=0;
+						if (next-ptr<8) continue;
+						if (swscanf(ptr,L"%x,%d",&uni_char,&mask)==2)
+						{
+
+							if (mask&2)	uni_filter->Set(uni_char[0]);
+							if (mask&1)
+							{
+								uni_char[1]=0;
+								WC_MB(uni_char,mb_char);
+								mb_filter->Set(*(WORD*)mb_char);
+							}
+						}
+					}
+				}
+			}
 		}
 		if (auto_inject>1) auto_inject=1;
 		if (auto_insert>1) auto_insert=1;
@@ -137,11 +236,16 @@ void LoadSettings()
 		window.right=window_right;
 		window.top=window_top;
 		window.bottom=window_bottom;
-		delete buffer;
+		NtFreeVirtualMemory(NtCurrentProcess(),&vm_buffer,&info.AllocationSize.LowPart,MEM_RELEASE);
 		NtClose(hFile);
 	}
 	else
 	{
+_no_setting:
+		for (int i=0;i<sizeof(setting_variable)/sizeof(LPVOID);i++)
+		{
+			*setting_variable[i]=default_setting[i];
+		}
 		split_time=200;
 		process_time=50;
 		inject_delay=3000;
@@ -150,10 +254,12 @@ void LoadSettings()
 		auto_insert=1;
 		clipboard_flag=0;
 		cyclic_remove=0;
+
 		window.left=100;
 		window.top=100;
 		window.right=800;
 		window.bottom=600;
+		
 	}
 }
 int Init()
@@ -207,6 +313,7 @@ LONG WINAPI ExceptionFilter(EXCEPTION_POINTERS *ExceptionInfo)
 	//NtTerminateProcess(NtCurrentProcess(),0);
 	return 0;
 }
+extern "C" int printf(const char*,...);
 int main()
 {
 	MSG msg;
@@ -215,10 +322,12 @@ int main()
 	hIns=(HINSTANCE)GetModuleBase();
 	MyRegisterClass(hIns);
 	InitCommonControls();
+	mb_filter=new CustomFilterMultiByte;
+	uni_filter=new CustomFilterUnicode;
 	LoadSettings();
 	InitInstance(hIns,admin,&window);
 	InitializeCriticalSection(&detach_cs);
-	pid_map=new BitMap;
+	pid_map=new BitMap(0x100);	
 	texts=new TextBuffer;
 	man=new HookManager;
 	pfman=new ProfileManager;
@@ -235,10 +344,11 @@ int main()
 	delete pfman;
 	delete man;
 	delete texts;
+	delete mb_filter;
+	delete uni_filter;
 	delete pid_map;
 	if (static_large_buffer!=0) delete static_large_buffer;
 _exit:
 	IthCloseSystemService();
-	//ExitProcess(0);
 	NtTerminateProcess(NtCurrentProcess(),0);
 }

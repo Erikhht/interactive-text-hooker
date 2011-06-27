@@ -132,7 +132,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 		wcscpy(dll_name,current_dir);
 		//swprintf(dll_mutex,L"ITH_%.4d_%s",current_process_id,current_dir);
 		swprintf(dll_mutex,L"ITH_%d",current_process_id);
-		swprintf(hm_mutex,L"ITH_HOOKMAN_%d",current_process_id);
+		swprintf(hm_mutex,L"ITH_HOOKMAN_%.4d",current_process_id);
 		hmMutex=IthCreateMutex(hm_mutex,0);
 		hMutex=IthCreateMutex(dll_mutex,1,&s);
 		if (s) return FALSE;
@@ -159,12 +159,11 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 		while (enter_count) NtDelayExecution(0,&lint);
 		for (TextHook* man=hookman;man<hookman+MAX_HOOK;man++) man->ClearHook();
 		NtUnmapViewOfSection(NtCurrentProcess(),hookman);
-		NtClose(hSection);
-		NtClose(hmMutex);
+		NtClose(hSection);	
 		NtClose(hMutex);
 		delete tree;
-		//FreeThreadStart(NtCurrentProcess());
 		IthCloseSystemService();
+		NtClose(hmMutex);
 		break;
 	}
 	default: 
