@@ -464,50 +464,61 @@ TextThread* ThreadTable::FindThread(DWORD number)
 }
 
 static const char sse_table_eq[0x100]={
-	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //0, compare 1
-	1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, //1, compare 2
-	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //2, compare 1
-	1,1,1,1, -1,-1,-1,-1, 1,1,1,1, -1,-1,-1,-1, //3, compare 3
-	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //4, compare 1
-	1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, //5, compare 2
-	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //6, compare 1
-	1,1,1,1, 1,1,1,1, -1,-1,-1,-1, -1,-1,-1,-1, //7, compare 4
-	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //8, compare 1
-	1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, //9, compare 2
-	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //a, compare 1
-	1,1,1,1, -1,-1,-1,-1, 1,1,1,1, -1,-1,-1,-1, //b, compare 3
-	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //c, compare 1
-	1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, 1,1,-1,-1, //d, compare 2
-	1,-1,1,-1, 1,-1,1,-1, 1,-1,1,-1 ,1,-1,1,-1, //e, compare 1
+	-1,1,-1,1, -1,1,-1,1, -1,1,-1,1, -1,1,-1,1, //0, compare 1
+	-1,-1,1,1, -1,-1,1,1, -1,-1,1,1, -1,-1,1,1, //1, compare 2
+	-1,1,-1,1, -1,1,-1,1, -1,1,-1,1, -1,1,-1,1, //0, compare 1
+	-1,-1,-1,-1, 1,1,1,1, -1,-1,-1,-1, 1,1,1,1, //3, compare 3
+	-1,1,-1,1, -1,1,-1,1, -1,1,-1,1, -1,1,-1,1, //0, compare 1
+	-1,-1,1,1, -1,-1,1,1, -1,-1,1,1, -1,-1,1,1, //1, compare 2
+	-1,1,-1,1, -1,1,-1,1, -1,1,-1,1, -1,1,-1,1, //0, compare 1
+	-1,-1,-1,-1, -1,-1,-1,-1, 1,1,1,1, 1,1,1,1, //7, compare 4
+	-1,1,-1,1, -1,1,-1,1, -1,1,-1,1, -1,1,-1,1, //0, compare 1
+	-1,-1,1,1, -1,-1,1,1, -1,-1,1,1, -1,-1,1,1, //1, compare 2
+	-1,1,-1,1, -1,1,-1,1, -1,1,-1,1, -1,1,-1,1, //0, compare 1
+	-1,-1,-1,-1, 1,1,1,1, -1,-1,-1,-1, 1,1,1,1, //3, compare 3
+	-1,1,-1,1, -1,1,-1,1, -1,1,-1,1, -1,1,-1,1, //0, compare 1
+	-1,-1,1,1, -1,-1,1,1, -1,-1,1,1, -1,-1,1,1, //1, compare 2
+	-1,1,-1,1, -1,1,-1,1, -1,1,-1,1, -1,1,-1,1, //0, compare 1
 	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0 //f, equal
 };
+char original_cmp(const ThreadParameter* t1, const ThreadParameter* t2)
+{
+	int t;
+	t=t1->pid-t2->pid;
+	if (t==0)
+	{
+		t=t1->hook-t2->hook;
+		if (t==0)
+		{
+			t=t1->retn-t2->retn;
+			if (t==0)
+			{
+				t=t1->spl-t2->spl;
+				if (t==0) return 0;
+				return t1->spl>t2->spl?1:-1;
+			}
+			else return t1->retn>t2->retn?1:-1;
+		}
+		else return t1->hook>t2->hook?1:-1;
+	}
+	else return t1->pid>t2->pid?1:-1;
+	//return t>0?1:-1;
+}
 char TCmp::operator()(const ThreadParameter* t1, const ThreadParameter* t2)
 	//SSE speed up. Compare 4 integer in const time without branching.
+	//The AVL tree branching needs 2 bit of information.
+	//One bit for equality and one bit for "less than" or "greater than".
+
 {
-	union
-	{
-		__m128 m0;
-		__m128i i0;
-		__m128d d0;
-	};
-	union
-	{
-		__m128 m1;
-		__m128i i1;
-		__m128d d1;
-	};
-	union
-	{
-		__m128 m2;
-		__m128i i2;
-		__m128d d2;
-	};
+	union{__m128 m0;__m128i i0;__m128d d0;};
+	union{__m128 m1;__m128i i1;__m128d d1;};
+	union{__m128 m2;__m128i i2;__m128d d2;};
 	int k0,k1;
 	d1 = _mm_loadu_pd((const double*)t1);
 	d2 = _mm_loadu_pd((const double*)t2);
-	i0 = _mm_sub_epi32(i1,i2);
-	i1 = _mm_cmpeq_epi32(i1,i2);
+	i0 = _mm_cmpgt_epi32(i1,i2);
 	k0 = _mm_movemask_ps(m0);
+	i1 = _mm_cmpeq_epi32(i1,i2);
 	k1 = _mm_movemask_ps(m1);
 	return sse_table_eq[k1*16+k0];
 }
@@ -673,8 +684,7 @@ void HookManager::RemoveProcessContext(DWORD pid)
 		{
 			if (it->PID()==pid)
 			{
-				if (false==Delete(it->GetThreadParameter()))
-					__asm int 3;
+				if (false==Delete(it->GetThreadParameter())) __asm int 3;
 				flag|=it->RemoveFromCombo();
 				if (it->Number()<new_thread_number)
 					new_thread_number=it->Number();
@@ -703,7 +713,6 @@ void HookManager::RemoveProcessContext(DWORD pid)
 		else ln=0;
 		it=thread_table->FindThread(ln);
 		if (it) it->ResetEditText();
-		//else __asm int 3
 	}
 }
 void HookManager::RegisterThread(TextThread* it, DWORD num)

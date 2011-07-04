@@ -155,7 +155,7 @@ void TextHook::Send(DWORD dwDataBase, DWORD dwRetn)
 	{
 	if ((dwType&NO_CONTEXT)==0)
 		if (HookFilter(dwRetn)) return;
-	dwCount=-1;
+	dwCount=0;
 	dwAddr=hp.addr;
 	if (trigger)
 	{

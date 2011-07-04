@@ -1223,6 +1223,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				SendMessage(hwndProc, WM_SETFONT, (WPARAM)hf, 0);
 				LoadBMP(hWnd);
 			}
+
 			return 0; 
 		case WM_COMMAND:
 			{
@@ -1339,6 +1340,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				DWORD l=LOWORD(lParam)>>3;
 				WORD h=GetDialogBaseUnits()>>16;
 				h=h+(h>>1);
+				HDC hDC=GetDC(hWnd);
+				RECT rc;
+				GetClientRect(hWnd,&rc);
+				FillRect(hDC,&rc,hWhiteBrush);
+				ReleaseDC(hWnd,hDC);
 				MoveWindow(hwndProcess, 0, 0, l, h, 1);
 				MoveWindow(hwndThread, l, 0, l, h, 1);
 				MoveWindow(hwndHook, l*2, 0, l, h, 1);
@@ -2951,6 +2957,7 @@ void FilterWindow::DeleteCurrentChar()
 	buffer[0]=0;
 	SetWindowText(hSJIS,buffer);
 	SetWindowText(hUnicode,buffer);
+	SetWindowText(hChar,buffer);
 	FillRect(hGlyphDC,&rc,white);
 	remove=1;modify=1;
 }

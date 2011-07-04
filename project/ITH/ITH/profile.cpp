@@ -31,7 +31,7 @@ LPWSTR EngineHookName[]=
 	L"SofthouseChara",L"CatSystem2",L"IronGameSystem",
 	L"Waffle",L"NitroPlus",L"DotNet1",L"RetouchSystem",
 	L"SiglusEngine",L"AbelSoftware",L"Live",L"FrontWing",
-	L"Bruns"
+	L"Bruns",L"CandySoft",L"ApRicot"
 };
 DWORD WINAPI InjectThread(LPVOID lpThreadParameter)
 {
@@ -319,6 +319,7 @@ void ProfileManager::LoadProfile()
 	IO_STATUS_BLOCK ios;
 	FILE_STANDARD_INFORMATION info;
 	NtQueryInformationFile(hFile,&ios,&info,sizeof(info),FileStandardInformation);
+	if (info.AllocationSize.LowPart<4) {NtClose(hFile);return;}
 	BYTE *path,*ptr,*buffer=new BYTE[info.AllocationSize.LowPart];
 	NtReadFile(hFile,0,0,0,&ios,buffer,info.AllocationSize.LowPart,0,0);
 	NtClose(hFile);

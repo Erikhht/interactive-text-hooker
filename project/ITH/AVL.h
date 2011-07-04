@@ -90,6 +90,17 @@ public:
 			while (Node->Right) Node=Node->Right;
 		return Node;
 	}
+	int height()
+	{
+		if (this==0) return 0;
+		int l,r,f;
+		l=Left->height();
+		r=Right->height();
+		f=factor;
+		if (l-r+f!=0) __debugbreak();
+		f=l>r?l:r;
+		return f+1;
+	}
 	TreeNode *Left,*Right,*Parent;
 	unsigned short rank;
 	char factor,reserve;
@@ -497,6 +508,12 @@ protected:
 	{
 		return factor>0? Node->Right : Node->Left;
 	}
+	void Check()
+	{
+		unsigned int k=(unsigned int)head.Right;
+		unsigned int t=head.Left->height();
+		if (k!=t) __debugbreak();
+	}
 	void _IncreaseHeight()
 	{
 		unsigned int k=(unsigned int)head.Right;
@@ -518,18 +535,6 @@ class SCMP
 public:
 	__forceinline char operator()(char* s1,char* s2)
 	{
-		/*__asm
-		{
-			push s1
-			push s2
-			call dword ptr [_stricmp]
-			add esp,8
-			mov ecx,eax
-			sar eax,31
-			neg ecx
-			shr ecx,31
-			or eax,ecx
-		}*/
 		int t=_stricmp(s1,s2);
 		if (t==0) return 0;		
 		return t>0? 1:-1;
@@ -557,18 +562,6 @@ class WCMP
 public:
 	__forceinline char operator()(wchar_t* s1,wchar_t* s2)
 	{
-		/*__asm
-		{
-			push s1
-			push s2
-			call dword ptr [_wcsicmp]
-			add esp,8
-			mov ecx,eax
-			sar eax,31
-			neg ecx
-			shr ecx,31
-			or eax,ecx
-		}*/
 		int t=_wcsicmp(s1,s2);
 		if (t==0) return 0;
 		return t>0? 1:-1;

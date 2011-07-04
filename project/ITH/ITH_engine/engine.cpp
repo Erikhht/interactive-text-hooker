@@ -24,9 +24,12 @@ HANDLE hEngineOn;
 static WCHAR engine[0x20];
 static DWORD module_base, module_limit;
 static LPVOID trigger_addr;
-static char text_buffer[0x1000];
+static union {
+	char text_buffer[0x1000];
+	wchar_t wc_buffer[0x800];
+};
 static char text_buffer_prev[0x1000];
-static DWORD buffer_index;
+static DWORD buffer_index,buffer_length;
 extern BYTE LeadByteTable[0x100];
 typedef bool (*tfun)(LPVOID addr, DWORD frame, DWORD stack);
 static tfun trigger_fun;
@@ -761,15 +764,15 @@ void InsertAtelierHook()
 	{
 		if (*(DWORD*)i==0xFF6ACCCC) //Find the function entry
 		{
-				HookParam hp={};
-				hp.addr=i+2;
-				hp.off=8;
-				hp.split=-0x18;
-				hp.length_offset=1;
-				hp.type=USING_SPLIT;
-				NewHook(hp,L"Atelier KAGUYA");
-				RegisterEngineType(ENGINE_ATELIER);
-				return;
+			HookParam hp={};
+			hp.addr=i+2;
+			hp.off=8;
+			hp.split=-0x18;
+			hp.length_offset=1;
+			hp.type=USING_SPLIT;
+			NewHook(hp,L"Atelier KAGUYA");
+			RegisterEngineType(ENGINE_ATELIER);
+			return;
 		}
 	}
 	OutputConsole(L"Unknown Atelier KAGUYA engine.");
@@ -926,7 +929,7 @@ void InsertShinaHook()
 			if (ver>40)
 			{
 				HookParam hp={};
-				if (ver==48)
+				if (ver>=48)
 				{
 					hp.addr=(DWORD)GetTextExtentPoint32A;
 					hp.extern_fun=(DWORD)SpecialHookShina;
@@ -1068,7 +1071,7 @@ void InsertCotophaHook()
 void InsertCatSystem2Hook()
 {
 	HookParam hp={};
-	DWORD search=0x95EB60F;
+	/*DWORD search=0x95EB60F;
 	DWORD j,i=SearchPattern(module_base,module_limit-module_base,&search,4);
 	if (i==0) return;
 	i+=module_base;
@@ -1081,14 +1084,15 @@ void InsertCatSystem2Hook()
 	hp.split=4;
 	hp.split_ind=0x18;
 	hp.type=BIG_ENDIAN|DATA_INDIRECT|USING_SPLIT|SPLIT_INDIRECT;
-	hp.length_offset=1;
-	/*hp.addr=FindCallAndEntryAbs((DWORD)GetTextMetricsA,module_limit-module_base,module_base,0xFF6ACCCC);
+	hp.length_offset=1;*/
+
+	hp.addr=FindCallAndEntryAbs((DWORD)GetTextMetricsA,module_limit-module_base,module_base,0xFF6ACCCC);
 	if (hp.addr==0) return;
 	hp.addr+=2;
 	hp.off=8;
 	hp.split=-0x10;
 	hp.length_offset=1;
-	hp.type=BIG_ENDIAN|USING_SPLIT;*/
+	hp.type=BIG_ENDIAN|USING_SPLIT;
 	NewHook(hp,L"CatSystem2");
 	RegisterEngineType(ENGINE_CATSYSTEM);
 }
@@ -1406,6 +1410,109 @@ void InsertFrontwingHook()
 	}
 	else OutputConsole(L"Unknown Frontwing engine");
 }
+void InsertCandyHook()
+{
+	DWORD i,j,k;
+	//__asm int 3
+	for (i=module_base+0x1000;i<module_limit-4;i++)
+	{
+		if (*(WORD*)i==0x5B3C|| //cmp al,0x5B
+			(*(DWORD*)i&0xFFF8FC)==0x5BF880) //cmp reg,0x5B
+		{
+			for (j=i,k=i-0x100;j>k;j--)
+			{
+				if ((*(DWORD*)j&0xFFFF)==0x8B55) //push ebp, mov ebp,esp, sub esp,*
+				{
+					HookParam hp={};
+					hp.addr=j;
+					hp.off=4;
+					hp.type=USING_STRING;
+					NewHook(hp,L"CandySoft");
+					RegisterEngineType(ENGINE_CANDY);
+					return;
+				}
+			}
+		}
+	}
+	OutputConsole(L"Unknown CandySoft engine.");
+}
+void SpecialHookApricot(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+{
+	DWORD reg_esi=*(DWORD*)(esp_base-0x20);
+	DWORD reg_esp=*(DWORD*)(esp_base-0x18);
+	DWORD base=*(DWORD*)(reg_esi+0x24);
+	DWORD index=*(DWORD*)(reg_esi+0x3C);
+	DWORD *script=(DWORD*)(base+index*4),*end;
+	*split=reg_esp;
+	if (script[0]==L'<')
+	{
+		for (end=script;*end!=L'>';end++);
+		if (script[1]==L'N')
+		{
+			if (script[2]==L'a'&&script[3]==L'm'&&script[4]==L'e')
+			{
+				buffer_index=0;
+				for (script+=5;script<end;script++)
+					if (*script>0x20)
+						wc_buffer[buffer_index++]=*script&0xFFFF;
+				*len=buffer_index<<1;
+				*data=(DWORD)wc_buffer;
+				*split|=1<<31;
+			}
+		}
+		else if (script[1]==L'T')
+		{
+			if (script[2]==L'e'&&script[3]==L'x'&&script[4]==L't')
+			{
+				buffer_index=0;
+				for (script+=5;script<end;script++)
+				{
+					if (*script>0x40)
+					{
+						while (*script==L'{')
+						{	
+							script++;
+							while (*script!=L'\\')
+							{
+								wc_buffer[buffer_index++]=*script&0xFFFF;
+								script++;
+							}
+							while (*script++!=L'}');
+						}				
+						wc_buffer[buffer_index++]=*script&0xFFFF;
+					}
+				}
+				*len=buffer_index<<1;
+				*data=(DWORD)wc_buffer;
+			}
+		}
+	}
+
+}
+void InsertApricotHook()
+{
+	DWORD i,j,k,t;
+	for (i=module_base+0x1000;i<module_limit-4;i++)
+	{
+		if ((*(DWORD*)i&0xFFF8FC)==0x3CF880) //cmp reg,0x3C
+		{
+			j=i+3;
+			for (k=i+0x100;j<k;j++)
+			{
+				if ((*(DWORD*)j&0xFFFFFF)==0x4C2) //retn 4
+				{
+					HookParam hp={};
+					hp.addr=j+3;
+					hp.extern_fun=(DWORD)SpecialHookApricot;
+					hp.type=EXTERN_HOOK|USING_STRING|USING_UNICODE|NO_CONTEXT;
+					NewHook(hp,L"ApRicot");
+					RegisterEngineType(ENGINE_APRICOT);
+					return;
+				}
+			}
+		}
+	}
+}
 void SpecialHookSofthouse(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
 {
 	DWORD i;
@@ -1480,7 +1587,7 @@ bool InsertSofthouseDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 }
 void InsertSoftHouseHook()
 {
-	OutputConsole(L"Probably SoftHouseChara. Wait for text.s");
+	OutputConsole(L"Probably SoftHouseChara. Wait for text.");
 	SwitchTrigger();
 	trigger_fun=InsertSofthouseDynamicHook;
 }
@@ -1578,28 +1685,33 @@ DWORD GetModuleBase()
 		mov eax,[eax+0x18]
 	}
 }
-bool IsKiriKiriEngine()
+bool SearchResourceString(LPWSTR str)
 {
 	DWORD hModule=GetModuleBase();
 	IMAGE_DOS_HEADER *DosHdr;
 	IMAGE_NT_HEADERS *NtHdr;
 	DosHdr=(IMAGE_DOS_HEADER*)hModule;
 	DWORD rsrc,size;
+	//__asm int 3
 	if (IMAGE_DOS_SIGNATURE==DosHdr->e_magic)
 	{
 		NtHdr=(IMAGE_NT_HEADERS*)(hModule+DosHdr->e_lfanew);
 		if (IMAGE_NT_SIGNATURE==NtHdr->Signature)
 		{
-			rsrc=	NtHdr->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE].VirtualAddress;
+			rsrc=NtHdr->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE].VirtualAddress;
 			if (rsrc)
 			{
 				rsrc+=hModule;
 				if (IthGetMemoryRange((LPVOID)rsrc,&rsrc,&size))
-				if (SearchPattern(rsrc,size-4,L"TVP(KIRIKIRI)",0x1A)) return true;
+					if (SearchPattern(rsrc,size-4,str,wcslen(str)<<1)) return true;
 			}
 		}
 	}
 	return false;
+}
+bool IsKiriKiriEngine()
+{
+	return SearchResourceString(L"TVP(KIRIKIRI)");
 }
 extern "C" DWORD __declspec(dllexport) DetermineEngineType()
 {
@@ -1627,6 +1739,11 @@ extern "C" DWORD __declspec(dllexport) DetermineEngineType()
 	if (IthCheckFile(L"message.dat"))
 	{
 		InsertAtelierHook();
+		return 0;
+	}
+	if (IthCheckFile(L"game_sys.exe"))
+	{
+		OutputConsole(L"Atelier Kaguya BY/TH");
 		return 0;
 	}
 	if (IthCheckFile(L"advdata\\dat\\names.dat"))
@@ -1671,6 +1788,7 @@ extern "C" DWORD __declspec(dllexport) DetermineEngineType()
 	}
 	if (IthFindFile(L"*.vfs"))
 	{
+		InsertSoftHouseHook();
 		return 0;
 	}
 	if (IthFindFile(L"*.mbl"))
@@ -1719,6 +1837,16 @@ extern "C" DWORD __declspec(dllexport) DetermineEngineType()
 	if (IthFindFile(L"rrecfg.rcf"))
 	{
 		InsertRREHook();
+		return 0;
+	}
+	if (IthFindFile(L"*.fpk"))
+	{
+		InsertCandyHook();
+		return 0;
+	}
+	if (IthFindFile(L"arc.a*"))
+	{
+		InsertApricotHook();
 		return 0;
 	}
 	wcscpy(str,process_name);
