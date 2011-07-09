@@ -530,6 +530,14 @@ MAJIRO hook:
 
 	Font caching issue. Find call to TextOutA and the function entry.
 
+	The original Majiro hook will catch furiga mixed with the text.
+	To split them out we need to find a parameter. Seems there's no
+	simple way to handle this case.
+	At the function entry, EAX seems to point to a structure to describe 
+	current	drawing context. +28 seems to be font size. +48 is negative
+	if furigana. I don't know exact meaning of this structure,
+	just do memory comparisons and get the value working for current release.
+
 ********************************************************************************************/
 void SpecialHookMajiro(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
 {
@@ -843,6 +851,8 @@ ShinaRio hook:
 	version of ShinaRio engine that needs different split parameter. Seems this value is
 	fixed to the last stack frame. We just navigate to the entry. There should be a
 	sub esp,* instruction. This value plus 4 is just the offset we need.
+
+	New ShinaRio engine (>=2.48) uses different approach.
 ********************************************************************************************/
 void SpecialHookShina(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
 {
@@ -1031,6 +1041,15 @@ void InsertLuneHook()
 	NewHook(hp,L"MBL");
 	RegisterEngineType(ENGINE_LUNE);
 }
+/********************************************************************************************
+YU-RIS hook:
+	Become common recently. I first encounter this game in Whirlpool games.
+	Problem is name is repeated multiple times.
+	Step out of function call to TextOuA, just before call to this function,
+	there should be a piece of code to calcuate the length of the name.
+	This length is 2 for single character name and text,
+	For a usual name this value is greater than 2.
+********************************************************************************************/
 void InsertWhirlpoolHook()
 {
 	DWORD i,t;
@@ -1273,6 +1292,13 @@ _again:
 	}
 	OutputConsole(L"Unknown malie system.");
 }
+/********************************************************************************************
+AbelSoftware hook:
+	The game folder usually is made up many no extended name files(file name doesn't have '.').
+	And these files have common prefix which is the game name, and 2 digit in order.
+
+
+********************************************************************************************/
 void InsertAbelHook()
 {
 	DWORD character[2]={0xC981D48A,0xFFFFFF00};
@@ -1410,10 +1436,49 @@ void InsertFrontwingHook()
 	}
 	else OutputConsole(L"Unknown Frontwing engine");
 }
+/********************************************************************************************
+CandySoft hook:
+	Game folder contains many *.fpk. Engine name is SystemC.
+	I haven't seen this engine in other company/brand.
+
+	AGTH /X3 will hook lstrlenA. One thread is the exactly result we want.
+	But the function call is difficult to located programmatically.
+	I find a equivalent points which is more easy to search.
+	The script processing function needs to find 0x5B'[',
+	so there should a instruction like cmp reg,5B
+	Find this position and navigate to function entry.
+	The first parameter is the string pointer.
+	This approach works fine with game later than ‚Â‚æ‚«‚·‚QŠwŠú.
+
+	But the original ‚Â‚æ‚«‚· is quite different. I handle this case separately.
+
+********************************************************************************************/
 void InsertCandyHook()
 {
 	DWORD i,j,k;
-	//__asm int 3
+	if (_wcsicmp(process_name,L"systemc.exe")==0)
+	{
+		for (i=module_base+0x1000;i<module_limit-4;i++)
+		{
+			if ((*(DWORD*)i&0xFFFFFF)==0x24F980) //cmp cl,24
+			{
+				for (k = i - 100, j = i; j > k; j--)
+				{
+					if (*(DWORD*)j==0xC0330A8A) //mov cl,[edx];xor eax,eax
+					{
+						HookParam hp={};
+						hp.addr=j;
+						hp.off=-0x10;
+						hp.type=USING_STRING;
+						NewHook(hp,L"SystemC");
+						RegisterEngineType(ENGINE_CANDY);
+						return;
+					}
+				}
+			}
+		}
+	}
+	else
 	for (i=module_base+0x1000;i<module_limit-4;i++)
 	{
 		if (*(WORD*)i==0x5B3C|| //cmp al,0x5B
@@ -1427,7 +1492,7 @@ void InsertCandyHook()
 					hp.addr=j;
 					hp.off=4;
 					hp.type=USING_STRING;
-					NewHook(hp,L"CandySoft");
+					NewHook(hp,L"SystemC");
 					RegisterEngineType(ENGINE_CANDY);
 					return;
 				}
@@ -1436,6 +1501,16 @@ void InsertCandyHook()
 	}
 	OutputConsole(L"Unknown CandySoft engine.");
 }
+/********************************************************************************************
+Apricot hook:
+	Game folder contains arc.a*.
+	This engine is heavily based on new DirectX interfaces.
+	I can't find a good place where text is clean and not repeating.
+	The game process script encoded in UTF-32 like format.
+	I reversed the parsing algorithm of the game and implement it partially.
+	Only name and text data is needed. 
+
+********************************************************************************************/
 void SpecialHookApricot(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
 {
 	DWORD reg_esi=*(DWORD*)(esp_base-0x20);
@@ -1491,7 +1566,7 @@ void SpecialHookApricot(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD*
 }
 void InsertApricotHook()
 {
-	DWORD i,j,k,t;
+	DWORD i,j,k;
 	for (i=module_base+0x1000;i<module_limit-4;i++)
 	{
 		if ((*(DWORD*)i&0xFFF8FC)==0x3CF880) //cmp reg,0x3C
@@ -1591,6 +1666,108 @@ void InsertSoftHouseHook()
 	SwitchTrigger();
 	trigger_fun=InsertSofthouseDynamicHook;
 }
+void SpecialHookCaramelBox(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+{
+	DWORD reg_ecx = *(DWORD*)(esp_base+hp.off);
+	BYTE* ptr = (BYTE*)reg_ecx;
+	buffer_index = 0;
+	while (ptr[0])
+	{
+		if (ptr[0] == 0x28) // Furigana format: (Kanji,Furi)
+		{
+			ptr++;
+			while (ptr[0]!=0x2C) //Copy Kanji
+				text_buffer[buffer_index++] = *ptr++;
+			while (ptr[0]!=0x29) // Skip Furi
+				ptr++;
+			ptr++;
+		}
+		else if (ptr[0] == 0x5C) ptr +=2;
+		else
+		{
+			text_buffer[buffer_index++] = ptr[0];
+			if (LeadByteTable[ptr[0]]==2)
+			{
+				ptr++;
+				text_buffer[buffer_index++] = ptr[0];
+			}
+			ptr++;
+		}
+	}
+	*len = buffer_index;
+	*data = (DWORD)text_buffer;
+	*split = 0;
+}
+void InsertCaramelBoxHook()
+{
+	DWORD j,k,flag,reg;
+	union {DWORD i; BYTE* pb; WORD* pw; DWORD* pd;};
+	reg = -1;
+	__asm int 3
+	for (i = module_base + 0x1000; i < module_limit - 4; i++)
+	{
+		
+		if (*pd == 0x7FF3D) //cmp eax, 7FF
+			reg = 0;
+		else if ((*pd & 0xFFFFF8FC) == 0x07FFF880) //cmp reg, 7FF
+			reg = pb[1] & 0x7;
+
+		if (reg == -1) continue;
+
+		flag = 0;
+		if (*(pb - 6) == 3) //add reg, [ebp+$disp_32]
+		{
+			if (*(pb - 5) == (0x85 | (reg << 3)))
+				flag = 1;
+		}
+		else if (*(pb - 3) == 3) //add reg, [ebp+$disp_8]
+		{
+			if (*(pb - 2) == (0x45 | (reg << 3)))
+				flag = 1;
+		}
+		else if (*(pb - 2) == 3) //add reg, reg
+		{
+			if (((*(pb - 1) >> 3) & 7)== reg) 
+				flag = 1;
+		}
+		reg = -1;
+		if (flag)
+		{
+			for (j = i, k = i - 0x100; j > k; j-- )
+			{
+				if ((*(DWORD*)j&0xFFFF00FF)==0x1000B8) //mov eax,10??
+				{
+					HookParam hp = {};
+					hp.addr = j & ~0xF;
+					hp.extern_fun = (DWORD)SpecialHookCaramelBox;
+					hp.type = USING_STRING | EXTERN_HOOK;
+					for (i &= ~0xFFFF; i < module_limit - 4; i++)
+					{
+						if (pb[0] == 0xE8)
+						{
+							pb++;
+							if (pd[0] + i + 4 == hp.addr)
+							{
+								pb += 4;
+								if ((pd[0] & 0xFFFFFF) == 0x04C483)
+									hp.off = 4;
+								else hp.off = -0xC;
+								break;
+							}
+						}
+					}
+					if (hp.off == 0) goto _unknown_engine;
+					NewHook(hp, L"CaramelBox");
+					RegisterEngineType(ENGINE_CARAMEL);
+					return;
+				}
+			}
+		}
+	}
+_unknown_engine:
+	OutputConsole(L"Unknown CarmelBox engine.");
+}
+
 bool InsertIGSDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 {
 	if (addr!=GetGlyphOutlineW) return false;
@@ -1685,6 +1862,7 @@ DWORD GetModuleBase()
 		mov eax,[eax+0x18]
 	}
 }
+//Search string in rsrc section. This section usually contains version and copyright info.
 bool SearchResourceString(LPWSTR str)
 {
 	DWORD hModule=GetModuleBase();
@@ -1713,9 +1891,9 @@ bool IsKiriKiriEngine()
 {
 	return SearchResourceString(L"TVP(KIRIKIRI)");
 }
-extern "C" DWORD __declspec(dllexport) DetermineEngineType()
+static BYTE static_file_info[0x1000];
+DWORD DetermineEngineWithFile()
 {
-	WCHAR str[0x40];
 	if (IthFindFile(L"*.xp3")||IsKiriKiriEngine())
 	{
 		InsertKiriKiriHook();
@@ -1849,6 +2027,35 @@ extern "C" DWORD __declspec(dllexport) DetermineEngineType()
 		InsertApricotHook();
 		return 0;
 	}
+	/*if (IthCheckFile(L"data.bin"))
+	{
+		if (IthGetFileInfo(L"*.bin",static_file_info))
+		{
+			BYTE *info=static_file_info;
+			while (1)
+			{
+				LPWSTR name=(LPWSTR)(info+0x5E);		
+				int len=wcslen(name);		
+				name[len-3]=L'e';	
+				name[len-2]=L'x';
+				name[len-1]=L'e';
+				name[len]=0;
+				//wcscpy(search_name,name);		
+				if (IthCheckFile(name))
+				{
+					InsertCaramelBoxHook();
+					return 0;
+				}
+				if (*(DWORD*)info==0) break;
+				info+=*(DWORD*)info;
+			}	
+		}
+	}*/
+	return 1;
+}
+DWORD DetermineEngineWithProcessName()
+{
+	WCHAR str[0x40];
 	wcscpy(str,process_name);
 	_wcslwr(str);
 	if (wcsstr(str,L"reallive"))
@@ -1866,16 +2073,25 @@ extern "C" DWORD __declspec(dllexport) DetermineEngineType()
 		InsertRUGPHook();
 		return 0;
 	}
-	/*if (wcsstr(str,L"malie"))
-	{
-		//InsertMalieHook();
-		return 0;
-	}*/
 	if (wcsstr(str,L"igs_sample"))
 	{
 		InsertIronGameSystemHook();
 		return 0;
 	}
+	DWORD len = wcslen(str);
+	str[len - 3] = L'b';
+	str[len - 2] = L'i';
+	str[len - 1] = L'n';
+	str[0] = 0;
+	if (IthCheckFile(str))
+	{
+		InsertCaramelBoxHook();
+		return 0;
+	}
+	return 1;
+}
+DWORD DetermineEngineOther()
+{
 	DWORD low,high;
 	if (FillRange(L"mscorlib.ni.dll",&low,&high))
 	{
@@ -1884,44 +2100,55 @@ extern "C" DWORD __declspec(dllexport) DetermineEngineType()
 	}
 	DWORD addr;
 	if (GetFunctionAddr("SP_TextDraw",&addr,&low,&high,0))
-	if (addr)
 	{
-		InsertAliceHook1(addr,low,low+high);
-		return 0;
-	}
-	if (GetFunctionAddr("SP_SetTextSprite",&addr,&low,&high,0))
-	if (addr)
-	{
-		InsertAliceHook2(addr);
-		return 0;
-	}
-	static BYTE static_file_info[0x1000];
-	if (IthGetFileInfo(L"*01",static_file_info))
-	{
-		if (*(DWORD*)static_file_info==0)
+		if (addr)
 		{
-			static WCHAR static_search_name[MAX_PATH];
-			LPWSTR name=(LPWSTR)(static_file_info+0x5E);
-			int len=wcslen(name);
-			name[len-2]=L'*';
-			name[len-1]=0;
-			wcscpy(static_search_name,name);
-			IthGetFileInfo(static_search_name,static_file_info);
-			BYTE* ptr=static_file_info;
-			len=0;
-			while (*(DWORD*)ptr)
-			{
-				ptr+=*(DWORD*)ptr;
-				len++;
-			}
-			if (len>3)
-			{
-				InsertAbelHook();
-				return 0;
-			}
+			InsertAliceHook1(addr,low,low+high);
+			return 0;
 		}
 	}
-
+	if (GetFunctionAddr("SP_SetTextSprite",&addr,&low,&high,0))
+	{
+		if (addr)
+		{
+			InsertAliceHook2(addr);
+			return 0;
+		}
+	}
+	
+	if (IthGetFileInfo(L"*01",static_file_info))
+	{	
+		if (*(DWORD*)static_file_info==0)
+		{
+			static WCHAR static_search_name[MAX_PATH];	
+			LPWSTR name=(LPWSTR)(static_file_info+0x5E);		
+			int len=wcslen(name);		
+			name[len-2]=L'*';	
+			name[len-1]=0;		
+			wcscpy(static_search_name,name);		
+			IthGetFileInfo(static_search_name,static_file_info);		
+			BYTE* ptr=static_file_info;		
+			len=0;		
+			while (*(DWORD*)ptr)		
+			{	
+				ptr+=*(DWORD*)ptr;		
+				len++;			
+			}	
+			if (len>3)		
+			{		
+				InsertAbelHook();			
+				return 0;			
+			}		
+		}	
+	}
+	return 1;
+}
+extern "C" DWORD __declspec(dllexport) DetermineEngineType()
+{
+	OutputConsole(L"ITH engine support module 2011.07.09");
+	if (DetermineEngineWithFile()==0) return 0;
+	if (DetermineEngineWithProcessName()==0) return 0;
+	if (DetermineEngineOther()==0) return 0;
 
 	OutputConsole(L"Unknown engine.");
 	return 0;
