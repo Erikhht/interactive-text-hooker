@@ -145,7 +145,7 @@ bool HookFilter(DWORD retn)
 	if (retn>filter[i].lower&&retn<filter[i].upper) return true;
 	return false;
 }
-#define SMALL_BUFF_SIZE 0x40
+#define SMALL_BUFF_SIZE 0x80
 void TextHook::Send(DWORD dwDataBase, DWORD dwRetn)
 {
 	DWORD dwCount,dwAddr,dwDataIn,dwSplit=0;

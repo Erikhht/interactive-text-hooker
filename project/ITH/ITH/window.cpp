@@ -2153,10 +2153,11 @@ void ThreadWindow::ExportAllThreadText()
 	LARGE_INTEGER time;
 	TIME_FIELDS tf;
 	TextThread* it;
-	if (GetWindowText(hwndProc,str_buffer,0x40))
+	str=str_buffer;
+	if (GetWindowText(hwndProc,str,0x40))
 	{
-		str_buffer[0x3F]=L'.';
-		for (str=str_buffer;*str!=L'.';str++);
+		str[0x3F]=L'.';
+		for (;*str!=L'.';str++);
 		*str=0;
 		HANDLE h=IthCreateDirectory(str_buffer+5);
 		if (INVALID_HANDLE_VALUE==h) return;

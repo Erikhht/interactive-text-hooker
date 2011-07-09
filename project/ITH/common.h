@@ -54,6 +54,8 @@ int sscanf(const char * _String, const char * _Format, ...);
 #define ENGINE_BRUNS 28
 #define ENGINE_CANDY 29
 #define ENGINE_APRICOT 30
+#define ENGINE_CARAMEL 31
+
 
 #define USING_STRING			0x1
 #define USING_UNICODE		0x2

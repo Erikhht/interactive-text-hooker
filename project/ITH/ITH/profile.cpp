@@ -31,7 +31,7 @@ LPWSTR EngineHookName[]=
 	L"SofthouseChara",L"CatSystem2",L"IronGameSystem",
 	L"Waffle",L"NitroPlus",L"DotNet1",L"RetouchSystem",
 	L"SiglusEngine",L"AbelSoftware",L"Live",L"FrontWing",
-	L"Bruns",L"CandySoft",L"ApRicot"
+	L"Bruns",L"SystemC",L"ApRicot",L"CaramelBox"
 };
 DWORD WINAPI InjectThread(LPVOID lpThreadParameter)
 {

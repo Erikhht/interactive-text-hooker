@@ -1703,7 +1703,6 @@ void InsertCaramelBoxHook()
 	DWORD j,k,flag,reg;
 	union {DWORD i; BYTE* pb; WORD* pw; DWORD* pd;};
 	reg = -1;
-	__asm int 3
 	for (i = module_base + 0x1000; i < module_limit - 4; i++)
 	{
 		
@@ -1767,7 +1766,37 @@ void InsertCaramelBoxHook()
 _unknown_engine:
 	OutputConsole(L"Unknown CarmelBox engine.");
 }
-
+void InsertWolfHook()
+{
+	__asm int 3
+	DWORD c1 = FindCallAndEntryAbs((DWORD)GetTextMetricsA,module_limit-module_base,module_base,0xEC81);
+	if (c1)
+	{
+		DWORD c2 = FindCallOrJmpRel(c1,module_limit-module_base,module_base,0);
+		if (c2)
+		{
+			union {DWORD i; WORD *k;};
+			DWORD j;
+			for (i = c2 - 0x100, j = c2 - 0x400; i > j; i--)
+			{
+				if (*k == 0xEC83)
+				{
+					HookParam hp = {};
+					hp.addr = i;
+					hp.off = -0xC;
+					hp.split = -0x18;
+					hp.type = DATA_INDIRECT | USING_SPLIT;
+					hp.length_offset = 1;
+					NewHook(hp, L"WolfRPG");
+					return;
+				}
+			}
+		}
+	}
+	
+	OutputConsole(L"Unknown WolfRPG engine.");
+	return;
+}
 bool InsertIGSDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 {
 	if (addr!=GetGlyphOutlineW) return false;
@@ -1892,7 +1921,7 @@ bool IsKiriKiriEngine()
 	return SearchResourceString(L"TVP(KIRIKIRI)");
 }
 static BYTE static_file_info[0x1000];
-DWORD DetermineEngineWithFile()
+DWORD DetermineEngineByFile()
 {
 	if (IthFindFile(L"*.xp3")||IsKiriKiriEngine())
 	{
@@ -2027,33 +2056,14 @@ DWORD DetermineEngineWithFile()
 		InsertApricotHook();
 		return 0;
 	}
-	/*if (IthCheckFile(L"data.bin"))
+	/*if (IthFindFile(L"data.wolf"))
 	{
-		if (IthGetFileInfo(L"*.bin",static_file_info))
-		{
-			BYTE *info=static_file_info;
-			while (1)
-			{
-				LPWSTR name=(LPWSTR)(info+0x5E);		
-				int len=wcslen(name);		
-				name[len-3]=L'e';	
-				name[len-2]=L'x';
-				name[len-1]=L'e';
-				name[len]=0;
-				//wcscpy(search_name,name);		
-				if (IthCheckFile(name))
-				{
-					InsertCaramelBoxHook();
-					return 0;
-				}
-				if (*(DWORD*)info==0) break;
-				info+=*(DWORD*)info;
-			}	
-		}
+		InsertWolfHook();
+		return 0;
 	}*/
 	return 1;
 }
-DWORD DetermineEngineWithProcessName()
+DWORD DetermineEngineByProcessName()
 {
 	WCHAR str[0x40];
 	wcscpy(str,process_name);
@@ -2082,7 +2092,7 @@ DWORD DetermineEngineWithProcessName()
 	str[len - 3] = L'b';
 	str[len - 2] = L'i';
 	str[len - 1] = L'n';
-	str[0] = 0;
+	str[len] = 0;
 	if (IthCheckFile(str))
 	{
 		InsertCaramelBoxHook();
@@ -2145,9 +2155,9 @@ DWORD DetermineEngineOther()
 }
 extern "C" DWORD __declspec(dllexport) DetermineEngineType()
 {
-	OutputConsole(L"ITH engine support module 2011.07.09");
-	if (DetermineEngineWithFile()==0) return 0;
-	if (DetermineEngineWithProcessName()==0) return 0;
+	OutputConsole(L"Engine support module 2011.07.09");
+	if (DetermineEngineByFile()==0) return 0;
+	if (DetermineEngineByProcessName()==0) return 0;
 	if (DetermineEngineOther()==0) return 0;
 
 	OutputConsole(L"Unknown engine.");

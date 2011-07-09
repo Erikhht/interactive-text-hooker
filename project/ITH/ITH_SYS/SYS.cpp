@@ -22,7 +22,7 @@
 WCHAR file_path[MAX_PATH]=L"\\??\\";
 LPWSTR current_dir;
 LPVOID page;
-DWORD current_process_id;
+DWORD current_process_id,nt_flag;
 HANDLE hHeap, root_obj, codepage_section, thread_man_section, thread_man_mutex;
 BYTE LeadByteTable[0x100]={
 	1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
@@ -43,7 +43,7 @@ BYTE LeadByteTable[0x100]={
 	2,2,2,2,2,2,2,2,2,2,2,2,2,1,1,1
 };
 BYTE launch_time[0x10];
-static BYTE file_info[0x400];
+static BYTE file_info[0x1000];
 DWORD GetShareMemory()
 {
 	__asm
@@ -274,32 +274,6 @@ finish:
 		add esp,ecx
 	}
 }
-/*DWORD SearchPattern_SSE(DWORD base, DWORD base_length, LPVOID search, DWORD search_length)
-{
-
-}
-int str_kmp_c(const char* s1, int cnt1, const char* s2, int cnt2 )
-{
-	int i, j;
-	i = 0; j = 0;
-	while ( i+j < cnt1)
-	{
-		if( s2[i] == s1[i+j]) 
-		{
-			i++;
-			if( i == cnt2) break; // found full match
-		}
-		else
-		{
-			j = j+i - ovrlap_tbl[i]; // update the offset in s1 to start next round of string compare
-			if( i > 0)
-			{
-				i = ovrlap_tbl[i]; // update the offset of s2 for next string compare should start at
-			}
-		}
-	};
-	return j;
-}*/
 DWORD IthGetMemoryRange(LPVOID mem, DWORD* base, DWORD* size)
 {
 	DWORD r;
@@ -309,6 +283,7 @@ DWORD IthGetMemoryRange(LPVOID mem, DWORD* base, DWORD* size)
 	if (size) *size=info.RegionSize;
 	return (info.Type&PAGE_NOACCESS)==0;
 }
+//Get full path of current process.
 LPWSTR GetModulePath()
 {
 	__asm
@@ -319,6 +294,7 @@ LPWSTR GetModulePath()
 		mov eax,[eax+0x28]
 	}
 }
+//SJIS->Unicode. 'mb' must be null-terminated. 'wc' should have enough space ( 2*strlen(mb) is safe).
 int MB_WC(char* mb, wchar_t* wc)
 {
 	__asm
@@ -352,6 +328,8 @@ _mb_fin:
 		pop eax
 	}
 }
+
+//Count characters of 'mb' string. 'mb_length' is max length.
 int MB_WC_count(char* mb, int mb_length)
 {
 	__asm
@@ -370,6 +348,8 @@ _mbc_count:
 		ja _mbc_count
 	}
 }
+
+//Unicode->SJIS. Analogous to MB_WC.
 int WC_MB(wchar_t *wc, char* mb)
 {
 	__asm
@@ -405,9 +385,22 @@ void CheckThreadStart()
 {
 	thread_man->CheckProcessMemory();
 }
+
+//Initialize environment for NT native calls.
+//1. Create new heap. Successive memory requests are handled buy this heap.
+//Destroying this heap will completely release all dynamic allocated memory, thus prevent memory leaks on unload.
+//2. Create handle to root directory of process objects (section/event/mutex/semaphore).
+//NtCreate* calls will use this handle as base directory.
+//3. Load SJIS code page. First check for Japanese locale. If not then load from 'C_932.nls' in system folder.
+//MB_WC & WC_MB use this code page for translation.
+//4. Locate current NT path (start with \??\).
+//NtCreateFile requires full path or a root handle. But this handle is different from object.
+//5. Map shared memory for ThreadStartManager into virtual address space.
+//This will allow IthCreateThread function properly.
 void IthInitSystemService()
 {
-	ULONG b; LPWSTR t,obj;
+	ULONG LowFragmentHeap; 
+	LPWSTR t,obj;
 	UNICODE_STRING us;
 	DWORD mem,size;
 	OBJECT_ATTRIBUTES oa={sizeof(oa),0,&us,OBJ_CASE_INSENSITIVE,0,0};
@@ -418,11 +411,14 @@ void IthInitSystemService()
 	{
 		mov eax,fs:[0x18]
 		mov ecx,[eax+0x20]
+		mov eax,[eax+0x30]
+		mov eax,[eax]
 		mov current_process_id,ecx
+		mov nt_flag,eax
 	}
-	b=2;
+	LowFragmentHeap=2;
 	hHeap=RtlCreateHeap(0x1002,0,0,0,0,0);
-	RtlSetHeapInformation(hHeap,HeapCompatibilityInformation,&b,sizeof(b));
+	RtlSetHeapInformation(hHeap,HeapCompatibilityInformation,&LowFragmentHeap,sizeof(LowFragmentHeap));
 	mem=GetShareMemory();
 	IthGetMemoryRange((LPVOID)mem,0,&size);
 	t=(LPWSTR)(mem+SearchPattern(mem,size,L"system32",0x10));
@@ -468,11 +464,11 @@ void IthInitSystemService()
 	NtMapViewOfSection(thread_man_section,NtCurrentProcess(),
 		(PVOID*)&thread_man,0,0,0,&size,ViewUnmap,0,PAGE_EXECUTE_READWRITE);
 	thread_man_mutex=IthCreateMutex(L"ITH_ThreadMan",0);
-	/*LARGE_INTEGER time;
-	NtQuerySystemTime(&time);
-	time.QuadPart-=GetTimeBias()->QuadPart;
-	RtlTimeToTimeFields(&time,(TIME_FIELDS*)&launch_time);*/
+
 }
+
+//Release resources allocated by IthInitSystemService.
+//After destroying the heap, all memory allocated by ITH module is returned to system.
 void IthCloseSystemService()
 {
 	if (*NlsAnsiCodePage!=0x3A4)
@@ -487,11 +483,16 @@ void IthCloseSystemService()
 	NtClose(thread_man_section);
 
 }
+//Check for existence of a file in current folder.
+//For ITH main module, it's ITH folder. For target process it's the target process's current folder.
 BOOL IthCheckFile(LPWSTR file)
 {
+	//return IthGetFileInfo(file,file_info);
 	wcscpy(current_dir,file);
 	return IthCheckFileFullPath(file_path);
 }
+//Check for existence of files in current folder.
+//Unlike IthCheckFile, this function allows wildcard character.
 BOOL IthFindFile(LPWSTR file)
 {
 	NTSTATUS status;
@@ -518,6 +519,7 @@ BOOL IthFindFile(LPWSTR file)
 	}
 	return FALSE;
 }
+//Analogous to IthFindFile, but return detail information in 'info'.
 BOOL IthGetFileInfo(LPWSTR file, LPVOID info)
 {
 	NTSTATUS status;
@@ -546,6 +548,7 @@ BOOL IthGetFileInfo(LPWSTR file, LPVOID info)
 	NtClose(h);
 	return status;
 }
+//Check for existence of a file with full NT path(start with \??\).
 BOOL IthCheckFileFullPath(LPWSTR file)
 {
 	UNICODE_STRING us;
@@ -560,6 +563,11 @@ BOOL IthCheckFileFullPath(LPWSTR file)
 	}
 	else return FALSE;
 }
+//Create or open file in current folder. Analogous to Win32 CreateFile.
+//option: GENERIC_READ / GENERIC_WRITE.
+//share: FILE_SHARE_READ / FILE_SHARE_WRITE / FILE_SHARE_DELETE. 0 for exclusive access.
+//disposition: FILE_OPEN / FILE_OPEN_IF. 
+//Use FILE_OPEN instead of OPEN_EXISTING and FILE_OPEN_IF for CREATE_ALWAYS. 
 HANDLE IthCreateFile(LPWSTR name, DWORD option, DWORD share, DWORD disposition)
 {
 	wcscpy(current_dir,name);
@@ -575,6 +583,7 @@ HANDLE IthCreateFile(LPWSTR name, DWORD option, DWORD share, DWORD disposition)
 		return hFile;
 	else return INVALID_HANDLE_VALUE;
 }
+//Create a directory file in current folder.
 HANDLE IthCreateDirectory(LPWSTR name)
 {
 	wcscpy(current_dir,name);
@@ -589,6 +598,7 @@ HANDLE IthCreateDirectory(LPWSTR name)
 		return hFile;
 	else return INVALID_HANDLE_VALUE;
 }
+//Analogous to IthCreateFile, but with full NT path.
 HANDLE IthCreateFileFullPath(LPWSTR full_path, DWORD option, DWORD share, DWORD disposition)
 {
 	WCHAR path[MAX_PATH]=L"\\??\\";
@@ -605,6 +615,7 @@ HANDLE IthCreateFileFullPath(LPWSTR full_path, DWORD option, DWORD share, DWORD 
 		return hFile;
 	else return INVALID_HANDLE_VALUE;
 }
+//Prompt for file name.
 HANDLE IthPromptCreateFile(DWORD option, DWORD share, DWORD disposition)
 {
 	OPENFILENAME ofn={sizeof(ofn)};       // common dialog box structure
@@ -629,6 +640,8 @@ HANDLE IthPromptCreateFile(DWORD option, DWORD share, DWORD disposition)
 	}
 	else return INVALID_HANDLE_VALUE;
 }
+//Create section object for sharing memory between processes.
+//Similar to CreateFileMapping.
 HANDLE IthCreateSection(LPWSTR name, DWORD size, DWORD right)
 {
 	HANDLE hSection;
@@ -652,6 +665,7 @@ HANDLE IthCreateSection(LPWSTR name, DWORD size, DWORD right)
 		else return INVALID_HANDLE_VALUE;
 	}
 }
+//Create event object. Similar to CreateEvent.
 HANDLE IthCreateEvent(LPWSTR name, DWORD auto_reset, DWORD init_state)
 {
 	HANDLE hEvent;
@@ -685,6 +699,8 @@ void IthResetEvent(HANDLE hEvent)
 {
 	NtClearEvent(hEvent);
 }
+//Create mutex object. Similar to CreateMutex.
+//If 'exist' is not null, it will be written 1 if mutex exist.
 HANDLE IthCreateMutex(LPWSTR name, BOOL InitialOwner, DWORD* exist)
 {
 	UNICODE_STRING us;
@@ -746,7 +762,8 @@ _wait:
 #define DEFAULT_STACK_LIMIT 0x400000
 #define DEFAULT_STACK_COMMIT 0x10000
 #define PAGE_SIZE 0x1000
-
+//Create new thread. 'hProc' must have following right. 
+//PROCESS_CREATE_THREAD, PROCESS_VM_OPERATION, PROCESS_VM_READ, PROCESS_VM_WRITE.
 HANDLE IthCreateThread(LPVOID start_addr, DWORD param, HANDLE hProc)
 {
 	HANDLE hThread;
@@ -788,7 +805,8 @@ HANDLE IthCreateThread(LPVOID start_addr, DWORD param, HANDLE hProc)
 	}
 	return INVALID_HANDLE_VALUE;
 }
-
+//Query module export table. Return function address if find.
+//Similar to GetProcAddress
 DWORD GetExportAddress(DWORD hModule,DWORD hash)
 {
 	IMAGE_DOS_HEADER *DosHdr;

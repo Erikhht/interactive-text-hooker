@@ -111,9 +111,13 @@ template<class T,class D>
 class NodePath
 {
 public:
-	NodePath(TreeNode<T,D> *n=0,char f=0):Node(n),factor(f) {}
+	NodePath(){memset(this,0,sizeof(NodePath));}
+	NodePath(TreeNode<T,D> *n,int f):Node(n),fact(f) {}
 	TreeNode<T,D> *Node;
+	union {
 	char factor;
+	int fact;
+	};
 };
 
 template <class T,class D, class fComp, class fCopy, class fLength>
@@ -395,12 +399,12 @@ protected:
 			}
 			BalanceNode=PathNode.Node;
 			if (BalanceNode->factor==0) 
-				//A balance node, just need to adjust the factor. Don't have to recurve since subtree height stays.
+				//A balance node, just need to adjust the factor. Don't have to recurse since subtree height not changed.
 			{
 				BalanceNode->factor=-PathNode.factor;
 				break;
 			}
-			if (BalanceNode->factor==PathNode.factor) //Node get more balance. Subtree height decrease, need to recurve.
+			if (BalanceNode->factor==PathNode.factor) //Node get more balance. Subtree height decrease, need to recurse.
 			{
 				BalanceNode->factor=0;
 				path.pop_back();

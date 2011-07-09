@@ -510,12 +510,12 @@ char TCmp::operator()(const ThreadParameter* t1, const ThreadParameter* t2)
 	//One bit for equality and one bit for "less than" or "greater than".
 
 {
-	union{__m128 m0;__m128i i0;__m128d d0;};
-	union{__m128 m1;__m128i i1;__m128d d1;};
-	union{__m128 m2;__m128i i2;__m128d d2;};
+	union{__m128 m0;__m128i i0;};
+	union{__m128 m1;__m128i i1;};
+	union{__m128 m2;__m128i i2;};
 	int k0,k1;
-	d1 = _mm_loadu_pd((const double*)t1);
-	d2 = _mm_loadu_pd((const double*)t2);
+	i1 = _mm_loadu_si128((const __m128i*)t1);
+	i2 = _mm_loadu_si128((const __m128i*)t2);
 	i0 = _mm_cmpgt_epi32(i1,i2);
 	k0 = _mm_movemask_ps(m0);
 	i1 = _mm_cmpeq_epi32(i1,i2);
@@ -555,7 +555,8 @@ HookManager::HookManager()
 }
 HookManager::~HookManager()
 {
-	NtWaitForSingleObject(destroy_event,0,0);
+	LARGE_INTEGER timeout={-1000*1000,-1};
+	NtWaitForSingleObject(destroy_event,0,&timeout);
 	delete thread_table;
 	delete head.key;
 	DeleteCriticalSection(&hmcs);
@@ -684,7 +685,8 @@ void HookManager::RemoveProcessContext(DWORD pid)
 		{
 			if (it->PID()==pid)
 			{
-				if (false==Delete(it->GetThreadParameter())) __asm int 3;
+				if (false==Delete(it->GetThreadParameter()))
+					if (nt_flag) __asm int 3
 				flag|=it->RemoveFromCombo();
 				if (it->Number()<new_thread_number)
 					new_thread_number=it->Number();
@@ -777,7 +779,7 @@ void HookManager::UnRegisterProcess(DWORD pid)
 	int i,j,k;
 	EnterCriticalSection(&hmcs);
 	WCHAR str[0x10];
-	swprintf(str,L"%d",pid);
+	swprintf(str,L"%.4d",pid);
 	i=SendMessage(hwndProc,CB_FINDSTRING,0,(LPARAM)str);
 	j=SendMessage(hwndProc,CB_GETCURSEL,0,0);
 	if (i!=CB_ERR)
@@ -785,7 +787,11 @@ void HookManager::UnRegisterProcess(DWORD pid)
 		k=SendMessage(hwndProc,CB_DELETESTRING,i,0);
 		if (i==j) SendMessage(hwndProc,CB_SETCURSEL,k-1,0);
 	}
-	else goto _unregistered;
+	else 
+	{
+		MessageBox(0,L"Internal error.",str,0);
+		goto _unregistered;
+	}
 	for (i=0;i<MAX_REGISTER;i++) if(record[i].pid_register==pid) break;
 	//FreeThreadStart(record[i].process_handle);
 
@@ -1226,6 +1232,7 @@ void TextThread::RemoveSingleRepeatAuto(BYTE* con,int &len)
 			{
 				repeat_detect_count=0;
 				status^=REPEAT_NUMBER_DECIDED;
+				last=0;
 				RepeatCountNode *t=head,*tt;
 				while (t)
 				{
@@ -1597,7 +1604,7 @@ void TextThread::AddToStore(BYTE* con,int len, bool new_line,bool console)
 		if (len<=0) return;
 		if(cyclic_remove) 
 		{
-			if (status&REPEAT_NUMBER_DECIDED)
+			//if (status&REPEAT_NUMBER_DECIDED)
 				RemoveCyclicRepeat(con,len);
 		}
 	}
