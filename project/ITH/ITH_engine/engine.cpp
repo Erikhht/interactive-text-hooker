@@ -21,12 +21,18 @@
 
 WCHAR process_name[MAX_PATH];
 HANDLE hEngineOn;
+struct CodeSection
+{
+	DWORD base;
+	DWORD size;
+};
 static WCHAR engine[0x20];
 static DWORD module_base, module_limit;
 static LPVOID trigger_addr;
 static union {
 	char text_buffer[0x1000];
 	wchar_t wc_buffer[0x800];
+	CodeSection code_section[0x200];
 };
 static char text_buffer_prev[0x1000];
 static DWORD buffer_index,buffer_length;
@@ -264,6 +270,22 @@ DWORD FindCallAndEntryRel(DWORD fun, DWORD size, DWORD pt, DWORD sig)
 			OutputConsole(L"Find call and entry failed.");
 			return 0;
 }
+DWORD FindEntryAligned(DWORD start, DWORD back_range)
+{
+	DWORD i,j;
+	start &= ~0xF;
+	for (i = start, j = start - back_range; i > j; i-=0x10)
+	{
+		if (*(DWORD*)(i - 4)==0xCCCCCCCC ||
+			*(DWORD*)(i - 4)==0xCCCCCCC3 ||
+			(*(DWORD*)(i - 4)|0xFF)==0xCCCCC3FF ||
+			*(WORD*)(i - 2)==0xCCC3 ||
+			*(BYTE*)(i - 1)==0xC3
+			)
+			return i;
+	}
+	return 0;
+}
 /********************************************************************************************
 KiriKiri hook:
 	Usually there are xp3 files in the game folder but also exceptions.
@@ -386,8 +408,9 @@ void InsertKiriKiriHook()
 BGI hook:
 	Usually game folder contains BGI.*. After first run BGI.gdb appears.
 
-	Usually BGI engine has font caching issue so the strategy is simple.
-	First find call to TextOutA then reverse to function entry until full text is caught.
+	BGI engine has font caching issue so the strategy is simple.
+	First find call to TextOutA or TextOutW then reverse to function entry point,
+	until full text is caught.
 	After 2 tries we will get to the right place. Use ESP value to split text since
 	it's likely to be different for different calls.
 ********************************************************************************************/
@@ -395,7 +418,8 @@ void FindBGIHook(DWORD fun, DWORD size, DWORD pt, WORD sig)
 {
 	WCHAR str[0x40];
 	DWORD i,j,k,l;
-	i=FindCallBoth(fun,size,pt);
+	i=fun;
+	//i=FindCallBoth(fun,size,pt);
 	if (i==0)
 	{
 		swprintf(str,L"Can't find BGI hook: %.8X.",fun);
@@ -432,10 +456,24 @@ void FindBGIHook(DWORD fun, DWORD size, DWORD pt, WORD sig)
 					}
 		}
 }
+bool InsertBGIDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
+{
+	if (addr==TextOutA||addr==TextOutW)
+	{
+		DWORD i=*(DWORD*)(stack+4)-module_base;
+		FindBGIHook(i,module_limit-module_base,module_base,0xEC83);
+		RegisterEngineType(ENGINE_BGI);
+		return true;
+	}
+	return false;
+}
 void InsertBGIHook()
 {
-	FindBGIHook((DWORD)TextOutA,module_limit-module_base,module_base,0xEC83);
-	RegisterEngineType(ENGINE_BGI);
+	//FindBGIHook((DWORD)TextOutA,module_limit-module_base,module_base,0xEC83);
+	//RegisterEngineType(ENGINE_BGI);
+	OutputConsole(L"Probably BGI. Wait for text.");
+	SwitchTrigger();
+	trigger_fun=InsertBGIDynamicHook;
 }
 /********************************************************************************************
 Reallive hook:
@@ -763,11 +801,11 @@ AtelierKaguya hook:
 ********************************************************************************************/
 void InsertAtelierHook()
 {
-	DWORD base,size,sig,i,j;
-	FillRange(process_name,&base,&size);
-	size=size-base;
+	DWORD sig,i,j;
+	//FillRange(process_name,&base,&size);
+	//size=size-base;
 	sig=0x40C683; //add esi,0x40
-	i=base+SearchPattern(base,size,&sig,3);
+	i=module_base+SearchPattern(module_base,module_limit-module_base,&sig,3);
 	for (j=i-0x200;i>j;i--)
 	{
 		if (*(DWORD*)i==0xFF6ACCCC) //Find the function entry
@@ -794,22 +832,21 @@ CIRCUS hook:
 	in the game main module there is a static buffer, which is filled by new text before
 	it's drawing to screen. By setting a hardware breakpoint there we can locate the
 	function filling the buffer. But we don't have to set hardware breakpoint to search
-	the hook address if we know some characterstic(cmp al,0x24) around there. 
+	the hook address if we know some characteristic instruction(cmp al,0x24) around there. 
 ********************************************************************************************/
 void InsertCircusHook()
 {
-	DWORD base,size,i,j,k;
-	FillRange(process_name,&base,&size);
-	size-=4;
-	for (i=base+0x1000;i<size-4;i++)
-		if (*(WORD*)i==0xA3C)
+	DWORD i,j,k;
+	//FillRange(process_name,&base,&size);
+	for (i=module_base+0x1000;i<module_limit-4;i++)
+		if (*(WORD*)i==0xA3C) //cmp al, 0xA; je
 		{
 			for (j=i;j<i+0x100;j++)
 			{
 				if (*(BYTE*)j==0xE8)
 				{
 					k=*(DWORD*)(j+1)+j+5;
-					if (k>base&&k<size)
+					if (k>module_base&&k<module_limit)
 					{
 						HookParam hp={};
 						hp.addr=k;
@@ -825,21 +862,28 @@ void InsertCircusHook()
 			}
 			break;
 		}
-	/*i=base+SearchPattern(base,size,&sig,2);
-	for (j=i-0x100;i>j;i--)
-	{
-		if (*(WORD*)i==0xEC83)
-		{
-			HookParam hp={};
-			hp.addr=i;
-			hp.off=8;
-			hp.type=USING_STRING;
-			NewHook(hp,L"CIRCUS");
-			RegisterEngineType(ENGINE_CIRCUS);
-			return;
-		}
-	}*/
 	OutputConsole(L"Unknown CIRCUS engine");
+}
+void InsertCircusHook2()
+{
+	DWORD i,j;
+	for (i=module_base+0x1000;i<module_limit-4;i++)
+		if ((*(DWORD*)i&0xFFFFFF)==0x75243C) // cmp al, 24; je
+		{
+			j = FindEntryAligned(i,0x80);
+			if (j)
+			{
+				HookParam hp={};
+				hp.addr=j;
+				hp.off=0x8;
+				hp.type=USING_STRING;
+				NewHook(hp,L"CIRCUS");
+				RegisterEngineType(ENGINE_CIRCUS);
+				return;
+			}
+			break;
+		}
+		OutputConsole(L"Unknown CIRCUS engine");
 }
 /********************************************************************************************
 ShinaRio hook:
@@ -971,19 +1015,74 @@ void InsertShinaHook()
 		}
 	}
 }
+bool InsertWaffleDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
+{
+	if (addr != GetTextExtentPoint32A) return false;
+	DWORD retn,limit,str;
+	WORD ch;
+	NTSTATUS status;
+	MEMORY_BASIC_INFORMATION info;
+	str = *(DWORD*)(stack+0xC);
+	ch = *(WORD*)str;
+	if (ch<0x100) return false;
+	limit = (stack | 0xFFFF) + 1;
+	for (stack += 0x10; stack < limit; stack += 4)
+	{
+		str = *(DWORD*)stack;
+		if ((str >> 16) == (stack >> 16)) continue; //No stack
+		status = NtQueryVirtualMemory(NtCurrentProcess(),(PVOID)str,MemoryBasicInformation,&info,sizeof(info),0);
+		if (!NT_SUCCESS(status) || info.Protect & PAGE_NOACCESS) continue; //Accessible
+		if (*(WORD*)(str + 4) == ch) break;
+	}
+	if (stack < limit)
+	{
+		for (limit = stack + 0x80; stack < limit ; stack += 4)
+		if (*(DWORD*)stack == -1)
+		{
+			retn = *(DWORD*)(stack + 4);
+			if (retn > module_base && retn < module_limit)
+			{
+				HookParam hp = {};
+				hp.addr = retn + *(DWORD*)(retn - 4);
+				hp.length_offset = 1;
+				hp.off = -0x20;
+				hp.ind = 4;
+				//hp.split = 0x1E8;
+				hp.type = DATA_INDIRECT;
+				NewHook(hp, L"WAFFLE");
+				RegisterEngineType(ENGINE_WAFFLE);
+				return true;
+			}
+
+		}
+
+	}
+	OutputConsole(L"Unknown waffle engine.");
+	return true;
+
+}
 void InsertWaffleHook()
 {
-	DWORD s;
-	HookParam hp;
-	s=0xAC68;
-	hp.addr=module_base+SearchPattern(module_base,module_limit-module_base-4,&s,4);
-	hp.length_offset=1;
-	hp.off=-0x20;
-	hp.ind=4;
-	hp.split=0x1E8;
-	hp.type=DATA_INDIRECT|USING_SPLIT;
-	NewHook(hp,L"WAFFLE");
-	RegisterEngineType(ENGINE_WAFFLE);
+	DWORD i;
+	for (i = module_base + 0x1000; i < module_limit - 4; i++)
+	{
+		if (*(DWORD*)i == 0xAC68)
+		{
+			HookParam hp = {};
+			hp.addr=i;
+			hp.length_offset=1;
+			hp.off=-0x20;
+			hp.ind=4;
+			hp.split=0x1E8;
+			hp.type=DATA_INDIRECT|USING_SPLIT;
+			NewHook(hp,L"WAFFLE");
+			RegisterEngineType(ENGINE_WAFFLE);
+			return;
+		}
+	}
+	OutputConsole(L"Probably Waffle. Wait for text.");
+	SwitchTrigger();
+	trigger_fun=InsertWaffleDynamicHook;
 }
 void InsertTinkerBellHook()
 {
@@ -1243,6 +1342,36 @@ void InsertRREHook()
 	}
 	else OutputConsole(L"Unknown RunrunEngine engine");
 }
+void InsertMEDHook()
+{
+	DWORD i,j,k,t;
+	__asm int 3
+	for (i = module_base; i<module_limit - 4; i++)
+	{
+		if (*(DWORD*)i == 0x8175) //cmp *, 8175
+		{
+			for (j = i, k = i + 0x100; j < k; j++)
+			{
+				if (*(BYTE*)j == 0xE8)
+				{
+					t = j + 5 + *(DWORD*)(j+1);
+					if (t > module_base && t < module_limit)
+					{
+						HookParam hp = {};
+						hp.addr = t;
+						hp.off = -0x8;
+						hp.length_offset = 1;
+						hp.type = BIG_ENDIAN;
+						NewHook(hp, L"MED");
+						//RegisterEngineType(ENGINE_MED);
+						return;
+					}
+				}
+			}
+		}
+	}
+	OutputConsole(L"Unknown MED engine.");
+}
 static DWORD furi_flag;
 void SpecialHookMalie(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
 {
@@ -1399,7 +1528,7 @@ void SpecialHookFrontwing(DWORD esp_base, const HookParam& hp, DWORD* data, DWOR
 	if (text)
 	{
 		BYTE c=text[0];
-		if (c!='^')
+		if (c!='^'&&msg)
 		{
 			msg+=8;
 			if (strcmp(msg,"MessageAction,self")==0)
@@ -1423,18 +1552,53 @@ void SpecialHookFrontwing(DWORD esp_base, const HookParam& hp, DWORD* data, DWOR
 }
 void InsertFrontwingHook()
 {
-	BYTE sig[8]={0x6A,0,0x6A,0,0x6A,0,0x6A,0};
-	DWORD i=SearchPattern(module_base,module_limit-module_base,sig,8);
-	if (i)
+
+	/*BYTE sig[8]={0x6A,0,0x6A,0,0x6A,0,0x6A,0};
+
+	DWORD i=SearchPattern(module_base,module_limit-module_base,sig,8);*/
+	DWORD i,j,t;
+	for (i = module_base + 0x1000; i < module_limit - 4; i++ )
+	{
+		if (*(DWORD*)i == 0x7FFE8347) //inc edi, cmp esi,7f
+		{
+			t = 0;
+			for (j = i; j < i + 0x10; j++)
+			{
+				if (*(DWORD*)j == 0xA0) //cmp esi,a0
+				{
+					t = 1;
+					break;
+				}
+			}
+			if (t)
+			{
+				for (j = i; j > i - 0x100; j--)
+				{
+					if (*(DWORD*)j == 0x83EC8B55) //push ebp, mov ebp,esp, sub esp,*
+					{
+						HookParam hp = {};
+						hp.addr = j;
+						hp.off = 0x18;
+						hp.length_offset = 1;
+						hp.type = DATA_INDIRECT;
+						NewHook(hp,L"QLIE");
+						RegisterEngineType(ENGINE_FRONTWING);
+						return;
+					}
+				}
+			}
+		}
+	}
+	/*if (i)
 	{
 		HookParam hp={};
 		hp.addr=module_base+i-3;
 		hp.extern_fun=(DWORD)SpecialHookFrontwing;
 		hp.type=EXTERN_HOOK|USING_STRING;
-		NewHook(hp,L"FrontWing");
+		NewHook(hp,L"QLIE");
 		RegisterEngineType(ENGINE_FRONTWING);
-	}
-	else OutputConsole(L"Unknown Frontwing engine");
+	}*/
+	OutputConsole(L"Unknown QLIE engine");
 }
 /********************************************************************************************
 CandySoft hook:
@@ -1587,6 +1751,135 @@ void InsertApricotHook()
 			}
 		}
 	}
+}
+void InsertStuffScriptHook()
+{
+	HookParam hp = {};
+	hp.addr = (DWORD)GetTextExtentPoint32A;
+	hp.off = 8;
+	hp.split = -0x18;
+	hp.type = USING_STRING | USING_SPLIT;
+	NewHook(hp, L"StuffScriptEngine");
+	//RegisterEngine(ENGINE_STUFFSCRIPT);
+}
+void InsertTriangleHook()
+{
+	DWORD i,j,k,t;
+	for (i = module_base; i < module_limit - 4; i++)
+	{
+		if ((*(DWORD*)i & 0xFFFFFF) == 0x75403C) // cmp al,0x40; jne
+		{
+			j = i + 4 + *(BYTE*)(i+3);
+			for (k = j + 0x20; j < k; j++)
+			{
+				if (*(BYTE*)j == 0xE8)
+				{
+					t = j + 5 + *(DWORD*)(j+1);
+					if (t > module_base && t < module_limit)
+					{
+						HookParam hp = {};
+						hp.addr = t;
+						hp.off = 4;
+						hp.type = USING_STRING;
+						NewHook(hp, L"Triangle");
+						//RegisterEngineType(ENGINE_TRIANGLE);
+						return;
+					}
+				}
+			}
+
+		}
+	}
+	OutputConsole(L"Old/Unknown Triangle engine.");
+}
+void InsertPensilHook()
+{
+	DWORD i,j;
+	for (i = module_base; i < module_limit - 4; i++)
+	{
+		if (*(DWORD*)i == 0x63813D) //cmp eax,8163
+		{
+			j = FindEntryAligned(i,0x100);
+			if (j)
+			{
+				HookParam hp = {};
+				hp.addr = j;
+				hp.off = 8;
+				hp.length_offset = 1;
+				NewHook(hp,L"Pencil");
+				//RegisterEngineType(ENGINE_PENSIL);
+			}
+		}
+	}
+	OutputConsole(L"Unknown Pensil engine.");
+}
+
+void SpecialHookDebonosu(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+{
+	DWORD retn = *(DWORD*)esp_base;
+	if (*(WORD*)retn == 0xC483) //add esp, *
+		hp.off = 4;
+	else
+		hp.off = -0x8;
+	hp.type ^= EXTERN_HOOK;
+	hp.extern_fun = 0;
+	*data = *(DWORD*)(esp_base + hp.off);
+	*len = strlen((char*)*data);
+}
+DWORD FindImportEntry(DWORD hModule, DWORD fun)
+{
+	IMAGE_DOS_HEADER *DosHdr;
+	IMAGE_NT_HEADERS *NtHdr;
+	DWORD IAT,end,pt,addr;
+	DosHdr = (IMAGE_DOS_HEADER*)hModule;
+	if (IMAGE_DOS_SIGNATURE == DosHdr -> e_magic)
+	{
+		NtHdr = (IMAGE_NT_HEADERS*)(hModule+DosHdr -> e_lfanew);
+		if (IMAGE_NT_SIGNATURE == NtHdr -> Signature)
+		{
+			IAT = NtHdr -> OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IAT].VirtualAddress;
+			end = NtHdr -> OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IAT].Size;
+			IAT += hModule;
+			end += IAT;
+			for (pt = IAT; pt < end; pt+= 4)
+			{
+				addr = *(DWORD*)pt;
+				if (addr == fun) return pt;
+			}
+		}
+	}
+	return 0;
+}
+void InsertDebonosuHook()
+{
+	DWORD fun,addr,search,i,j,k,push;
+	if (GetFunctionAddr("lstrcatA",&fun,0,0,0) == 0) return;
+	addr = FindImportEntry(module_base,fun);
+	if (addr == 0) return;
+	search = 0x15FF | (addr << 16);
+	addr >>= 16;
+	for (i = module_base; i < module_limit - 4; i++)
+	{
+		if (*(DWORD*)i != search) continue;
+		if (*(WORD*)(i + 4) != addr) continue;// call dword ptr lstrcatA
+		if (*(BYTE*)(i - 5) != 0x68) continue;// push $
+		push = *(DWORD*)(i - 4);
+		j = i + 6;
+		for (k = j + 0x10; j < k; j++)
+		{
+			if (*(BYTE*)j != 0xB8) continue;
+			if (*(DWORD*)(j + 1) != push) continue;
+			HookParam hp = {};
+			hp.addr = FindEntryAligned(i, 0x200);
+			hp.extern_fun = (DWORD)SpecialHookDebonosu;
+			if (hp.addr == 0) continue;
+			hp.type = USING_STRING | EXTERN_HOOK;
+			NewHook(hp, L"Debonosu");
+			//RegisterEngineType(ENGINE_DEBONOSU);
+			return;
+		}
+	}
+	OutputConsole(L"Unknown Debonosu engine.");
 }
 void SpecialHookSofthouse(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
 {
@@ -1829,6 +2122,7 @@ void InsertIronGameSystemHook()
 	SwitchTrigger();
 	trigger_fun=InsertIGSDynamicHook;
 }
+/*
 void SpecialHookDotNet(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
 {
 	DWORD ptr=*(DWORD*)(esp_base-0x10);
@@ -1876,6 +2170,154 @@ void InsertDotNetHook1(DWORD module, DWORD module_limit)
 		}
 	}
 }
+*/
+int cmp(const void * a, const void * b)
+{
+	return *(int*)a - *(int*)b;
+}
+/********************************************************************************************
+AkabeiSoft2Try hook:
+	Game folder contains GameLib.dll.
+	This engine is based on .NET framework. This really makes it troublesome to locate a
+	valid hook address. The problem is that the engine file merely contains bytecode for
+	the CLR. Real meaningful object code is generated dynamicly and the address is randomized.
+	Therefore the easiest method is brute force search whole address space. While it's not necessary 
+	to completely search the whole address space, since non-executable pages can be excluded first.
+	The generated code sections do not belong to any module(exe/dll), hence they do not have 
+	a section name. So we can also exclude executable pages from all modules. At last, the code
+	section should be long(>0x2000). The remain address space should be several MB and can be
+	examined in reasonable time.
+	Characteristic sequence is 0F B7 44 50 0C, stands for movzx eax, word ptr [edx*2 + eax + C].
+	Obviously this instruction extract one unicode character from a string.
+	A main shortcoming is that the code is not generated if it's not being used.
+	So if you are in title screen this approach will fail.
+
+********************************************************************************************/
+MEMORY_WORKING_SET_LIST* GetWorkingSet()
+{
+	DWORD len,retl,s;
+	NTSTATUS status;
+	LPVOID buffer = 0; 
+	len = 0x4000;
+	status = NtAllocateVirtualMemory(NtCurrentProcess(), &buffer, 0, &len, MEM_COMMIT, PAGE_READWRITE);
+	if (!NT_SUCCESS(status)) return 0;
+	status = NtQueryVirtualMemory(NtCurrentProcess(), 0, MemoryWorkingSetList, buffer, len, &retl);
+	if (status == STATUS_INFO_LENGTH_MISMATCH)
+	{
+		len = *(DWORD*)buffer;
+		len = ((len << 2) & 0xFFFFF000) + 0x4000;
+		s = 0;
+		NtFreeVirtualMemory(NtCurrentProcess(), &buffer, &s, MEM_RELEASE);
+		buffer = 0;
+		status = NtAllocateVirtualMemory(NtCurrentProcess(), &buffer, 0, &len, MEM_COMMIT, PAGE_READWRITE);
+		if (!NT_SUCCESS(status)) return 0;
+		status = NtQueryVirtualMemory(NtCurrentProcess(), 0, MemoryWorkingSetList, buffer, len, &retl);
+		if (!NT_SUCCESS(status)) return 0;
+	}
+	return (MEMORY_WORKING_SET_LIST*)buffer;
+}
+void ParseWorkingSet(MEMORY_WORKING_SET_LIST* list)
+{
+	NTSTATUS status;
+	WCHAR path[MAX_PATH];
+	DWORD count = 0, i, retl;
+	union{
+		DWORD addr;
+		PVOID paddr;
+	};
+	for (i = 0; i<list->NumberOfPages; i++)
+	{
+		addr = list->WorkingSetList[i] & ~0xFFF;
+		if (list->WorkingSetList[i] & 2)
+		{
+			//Select executable sections without a name, i.e. those are not part of exe or dll.
+			status = NtQueryVirtualMemory(NtCurrentProcess(),paddr,MemorySectionName,path,MAX_PATH<<1,&retl);
+			if (NT_SUCCESS(status)) continue;
+			list->WorkingSetList[count++]=addr;
+		}
+	}
+	qsort(&list->WorkingSetList, count, 4, cmp);
+	list->NumberOfPages = count;
+};
+void MergeCodeSection(MEMORY_WORKING_SET_LIST* list)
+{
+	//Merge pages into sections.
+	CodeSection *ps,*pe,*pt; 
+	DWORD i;
+	ps = code_section;
+	ps->base = list->WorkingSetList[0];
+	ps->size = 0x1000;
+	for (i = 1; i < list->NumberOfPages; i++)
+	{
+		if (ps->base + ps->size == list->WorkingSetList[i])
+		{
+			ps->size+=0x1000;
+		}
+		else
+		{
+			ps++;
+			ps->base = list->WorkingSetList[i];
+			ps->size = 0x1000;
+		}
+	}
+	//Selection sections bigger than 0x2000
+	pe = code_section;
+	for (pt = code_section; pt != ps; pt++)
+	{
+		if (pt->size>0x2000)
+		{
+			pe->base = pt->base;
+			pe->size = pt->size;
+			pe++;
+		}
+	}
+	pe->base = 0;
+	pe->size = 0;
+}
+void SpecialHookAB2Try(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+{
+	DWORD test = *(DWORD*)(esp_base-0x10);
+	if (test!=0) return;
+	DWORD ptr=*(DWORD*)(esp_base-0x8);
+	*len=*(DWORD*)(ptr+8)<<1;
+	*data=ptr+0xC;
+	*split=0;
+}
+void InsertAB2TryHook()
+{
+	MEMORY_WORKING_SET_LIST* list = GetWorkingSet();
+	if (list == 0) return;
+	ParseWorkingSet(list);
+	MergeCodeSection(list);
+	CodeSection *ps;
+	DWORD i,j;
+	for (ps = code_section; ps->base; ps++)
+	{
+		j = ps->base + ps->size - 4;
+		for (i = ps->base; i < j; i++)
+		{
+			if (*(DWORD*)i == 0x5044B70F)
+			{
+				if (*(BYTE*)(i+4) == 0xC) //movzx eax, word ptr [edx*2 + eax + 0xC]; wchar = string[i];
+				{
+					HookParam hp = {};
+					hp.addr = i;
+					hp.extern_fun = (DWORD)SpecialHookAB2Try;
+					hp.type = USING_STRING | USING_UNICODE| EXTERN_HOOK | NO_CONTEXT;
+					NewHook(hp,L"AB2Try");
+					OutputConsole(L"Please adjust text speed to fastest/immediate.");
+					//RegisterEngineType(ENGINE_AB2T);
+					goto found_ab2t;
+				}
+			}
+		}
+	}
+	OutputConsole(L"Can't find characteristic sequence. \
+Make sure you have start the game and some text on the screen.");
+found_ab2t:
+	i = 0;
+	NtFreeVirtualMemory(NtCurrentProcess(), (PVOID*)&list, &i, MEM_RELEASE);
+}
 extern "C" int __declspec(dllexport) InsertDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 {
 	return !trigger_fun(addr,frame,stack);
@@ -1921,7 +2363,7 @@ bool IsKiriKiriEngine()
 	return SearchResourceString(L"TVP(KIRIKIRI)");
 }
 static BYTE static_file_info[0x1000];
-DWORD DetermineEngineByFile()
+DWORD DetermineEngineByFile1()
 {
 	if (IthFindFile(L"*.xp3")||IsKiriKiriEngine())
 	{
@@ -1948,14 +2390,13 @@ DWORD DetermineEngineByFile()
 		InsertAtelierHook();
 		return 0;
 	}
-	if (IthCheckFile(L"game_sys.exe"))
+
+	if (IthCheckFile(L"advdata\\voice.dat"))
 	{
-		OutputConsole(L"Atelier Kaguya BY/TH");
-		return 0;
-	}
-	if (IthCheckFile(L"advdata\\dat\\names.dat"))
-	{
-		InsertCircusHook();
+		if (IthCheckFile(L"advdata\\dat\\names.dat"))
+			InsertCircusHook();			
+		else
+			InsertCircusHook2();
 		return 0;
 	}
 	if (IthFindFile(L"*.war"))
@@ -1978,6 +2419,16 @@ DWORD DetermineEngineByFile()
 		InsertFrontwingHook();
 		return 0;
 	}
+
+	/*if (IthFindFile(L"data.wolf"))
+	{
+		InsertWolfHook();
+		return 0;
+	}*/
+	return 1;
+}
+DWORD DetermineEngineByFile2()
+{
 	if (IthFindFile(L"*.lpk"))
 	{
 		InsertLucifenHook();
@@ -2031,6 +2482,10 @@ DWORD DetermineEngineByFile()
 		InsertLiveHook();
 		return 0;
 	}
+	return 1;
+}
+DWORD DetermineEngineByFile3()
+{
 	if (IthCheckFile(L"libscr.dll"))
 	{
 		InsertBrunsHook();
@@ -2056,16 +2511,48 @@ DWORD DetermineEngineByFile()
 		InsertApricotHook();
 		return 0;
 	}
-	/*if (IthFindFile(L"data.wolf"))
+	if (IthFindFile(L"*.mpk"))
 	{
-		InsertWolfHook();
+		InsertStuffScriptHook();
 		return 0;
-	}*/
+	}
+	if (IthCheckFile(L"Execle.exe"))
+	{
+		InsertTriangleHook();
+		return 0;
+	}
+	if (IthCheckFile(L"pencil_production.mpg"))
+	{
+		InsertPensilHook();
+		return 0;
+	}
+	if (IthFindFile(L"*.med"))
+	{
+		InsertMEDHook();
+		return 0;
+	}
+	if (IthCheckFile(L"GameLib.dll"))
+	{
+		if (IthFindFile(L"dat\\*.dat"))
+		{
+			InsertAB2TryHook();
+			return 0;
+		}
+	}
+	return 1;
+}
+DWORD DetermineEngineByFile4()
+{
+	if (IthCheckFile(L"bmp.pak") && IthCheckFile(L"dsetup.dll"))
+	{
+		InsertDebonosuHook();
+		return 0;
+	}
 	return 1;
 }
 DWORD DetermineEngineByProcessName()
 {
-	WCHAR str[0x40];
+	WCHAR str[MAX_PATH];
 	wcscpy(str,process_name);
 	_wcslwr(str);
 	if (wcsstr(str,L"reallive"))
@@ -2103,11 +2590,11 @@ DWORD DetermineEngineByProcessName()
 DWORD DetermineEngineOther()
 {
 	DWORD low,high;
-	if (FillRange(L"mscorlib.ni.dll",&low,&high))
+	/*if (FillRange(L"mscorlib.ni.dll",&low,&high))
 	{
 		InsertDotNetHook1(low,high);
 		return 0;
-	}
+	}*/
 	DWORD addr;
 	if (GetFunctionAddr("SP_TextDraw",&addr,&low,&high,0))
 	{
@@ -2153,13 +2640,69 @@ DWORD DetermineEngineOther()
 	}
 	return 1;
 }
+DWORD DetermineNoHookEngine()
+{
+
+	if (IthCheckFile(L"game_sys.exe"))
+	{
+		OutputConsole(L"Atelier Kaguya BY/TH");
+		return 0;
+	}
+	if (IthFindFile(L"*.ykc"))
+	{
+		OutputConsole(L"HookSoft");
+		return 0;
+	}
+	if (IthFindFile(L"*.bsa"))
+	{
+		OutputConsole(L"Bishop");
+		return 0;
+	}
+
+	if (IthFindFile(L"*.pac"))
+	{
+		if (IthCheckFile(L"Thumbnail.pac"))
+		{
+			OutputConsole(L"GIGA");
+			return 0;
+		}
+		if (SearchResourceString(L"SOFTPAL"))
+		{
+			OutputConsole(L"SoftPal UNiSONSHIFT");
+			return 0;
+		}
+	}
+	WCHAR str[MAX_PATH];
+	DWORD i;
+	for (i = 0; process_name[i]; i++)
+	{
+		
+		str[i] = process_name[i];
+		if (process_name[i] == L'.') break;
+	}
+	*(DWORD*)(str + i + 1) = 0x630068; //.hcb
+	*(DWORD*)(str + i + 3) = 0x62;
+	if (IthCheckFile(str))
+	{
+		OutputConsole(L"FVP");
+		return 0;
+	}
+	return 1;
+}
 extern "C" DWORD __declspec(dllexport) DetermineEngineType()
 {
-	OutputConsole(L"Engine support module 2011.07.09");
-	if (DetermineEngineByFile()==0) return 0;
+	OutputConsole(L"Engine support module 2011.10.05");
+	if (DetermineEngineByFile1()==0) return 0;
+	if (DetermineEngineByFile2()==0) return 0;
+	if (DetermineEngineByFile3()==0) return 0;
+	if (DetermineEngineByFile4()==0) return 0;
 	if (DetermineEngineByProcessName()==0) return 0;
 	if (DetermineEngineOther()==0) return 0;
-
+	if (DetermineNoHookEngine()==0)
+	{
+		OutputConsole(L"No special hook.");
+		return 0;
+	}
 	OutputConsole(L"Unknown engine.");
 	return 0;
 }
