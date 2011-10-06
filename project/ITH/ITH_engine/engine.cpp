@@ -1345,7 +1345,6 @@ void InsertRREHook()
 void InsertMEDHook()
 {
 	DWORD i,j,k,t;
-	__asm int 3
 	for (i = module_base; i<module_limit - 4; i++)
 	{
 		if (*(DWORD*)i == 0x8175) //cmp *, 8175
@@ -1813,7 +1812,6 @@ void InsertPensilHook()
 	}
 	OutputConsole(L"Unknown Pensil engine.");
 }
-
 void SpecialHookDebonosu(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
 {
 	DWORD retn = *(DWORD*)esp_base;
@@ -2180,8 +2178,8 @@ AkabeiSoft2Try hook:
 	Game folder contains GameLib.dll.
 	This engine is based on .NET framework. This really makes it troublesome to locate a
 	valid hook address. The problem is that the engine file merely contains bytecode for
-	the CLR. Real meaningful object code is generated dynamicly and the address is randomized.
-	Therefore the easiest method is brute force search whole address space. While it's not necessary 
+	the CLR. Real meaningful object code is generated dynamicaly and the address is randomized.
+	Therefore the easiest method is to brute force search whole address space. While it's not necessary 
 	to completely search the whole address space, since non-executable pages can be excluded first.
 	The generated code sections do not belong to any module(exe/dll), hence they do not have 
 	a section name. So we can also exclude executable pages from all modules. At last, the code
@@ -2317,6 +2315,22 @@ Make sure you have start the game and some text on the screen.");
 found_ab2t:
 	i = 0;
 	NtFreeVirtualMemory(NtCurrentProcess(), (PVOID*)&list, &i, MEM_RELEASE);
+}
+void InsertC4Hook()
+{
+	BYTE sig[8]={0x8A, 0x10, 0x40, 0x80, 0xFA, 0x5F, 0x88, 0x15};
+	DWORD i=SearchPattern(module_base,module_limit-module_base,sig,8);
+	if (i)
+	{
+		HookParam hp={};
+		hp.addr=i+module_base;
+		hp.off=-0x08;
+		hp.type|=DATA_INDIRECT|NO_CONTEXT;
+		hp.length_offset=1;
+		NewHook(hp,L"C4");
+		//RegisterEngineType(ENGINE_C4);
+	}
+	else OutputConsole(L"Unknown C4 engine");
 }
 extern "C" int __declspec(dllexport) InsertDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 {
@@ -2548,6 +2562,11 @@ DWORD DetermineEngineByFile4()
 		InsertDebonosuHook();
 		return 0;
 	}
+	if (IthFindFile(L"C4.EXE") || IthFindFile(L"XEX.EXE"))
+	{
+		InsertC4Hook();
+		return 0;
+	}
 	return 1;
 }
 DWORD DetermineEngineByProcessName()
@@ -2691,7 +2710,7 @@ DWORD DetermineNoHookEngine()
 }
 extern "C" DWORD __declspec(dllexport) DetermineEngineType()
 {
-	OutputConsole(L"Engine support module 2011.10.05");
+	OutputConsole(L"Engine support module 2011.10.06");
 	if (DetermineEngineByFile1()==0) return 0;
 	if (DetermineEngineByFile2()==0) return 0;
 	if (DetermineEngineByFile3()==0) return 0;
