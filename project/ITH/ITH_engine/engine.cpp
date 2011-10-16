@@ -2218,20 +2218,23 @@ void ParseWorkingSet(MEMORY_WORKING_SET_LIST* list)
 {
 	NTSTATUS status;
 	WCHAR path[MAX_PATH];
-	DWORD count = 0, i, retl;
-	union{
-		DWORD addr;
-		PVOID paddr;
-	};
-	for (i = 0; i<list->NumberOfPages; i++)
+	DWORD count = 0, i, retl, addr;
+	for (i = 0; i < list->NumberOfPages; i++)
 	{
+		//High 20 bit is page address. Low 12 bit is a set of flags.
 		addr = list->WorkingSetList[i] & ~0xFFF;
-		if (list->WorkingSetList[i] & 2)
+
+		//On WinXP working set contains address higher than 0x80000000 which belongs to kernel space.
+		//Some of those pages is also marked executable but they can't be read directly from user space.
+		//So we must skip them first, otherwise access violation may occur in following procedure.
+		if (addr >> 31) continue; 
+
+		if (list->WorkingSetList[i] & 2) //WSLE_PAGE_EXECUTE
 		{
 			//Select executable sections without a name, i.e. those are not part of exe or dll.
-			status = NtQueryVirtualMemory(NtCurrentProcess(),paddr,MemorySectionName,path,MAX_PATH<<1,&retl);
+			status = NtQueryVirtualMemory(NtCurrentProcess(),(PVOID)addr,MemorySectionName,path,MAX_PATH<<1,&retl);
 			if (NT_SUCCESS(status)) continue;
-			list->WorkingSetList[count++]=addr;
+			list->WorkingSetList[count++] = addr;
 		}
 	}
 	qsort(&list->WorkingSetList, count, 4, cmp);
@@ -2249,7 +2252,7 @@ void MergeCodeSection(MEMORY_WORKING_SET_LIST* list)
 	{
 		if (ps->base + ps->size == list->WorkingSetList[i])
 		{
-			ps->size+=0x1000;
+			ps->size += 0x1000;
 		}
 		else
 		{
@@ -2259,6 +2262,7 @@ void MergeCodeSection(MEMORY_WORKING_SET_LIST* list)
 		}
 	}
 	//Selection sections bigger than 0x2000
+	ps++;
 	pe = code_section;
 	for (pt = code_section; pt != ps; pt++)
 	{
@@ -2274,15 +2278,16 @@ void MergeCodeSection(MEMORY_WORKING_SET_LIST* list)
 }
 void SpecialHookAB2Try(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
 {
-	DWORD test = *(DWORD*)(esp_base-0x10);
-	if (test!=0) return;
-	DWORD ptr=*(DWORD*)(esp_base-0x8);
-	*len=*(DWORD*)(ptr+8)<<1;
-	*data=ptr+0xC;
-	*split=0;
+	DWORD test = *(DWORD*)(esp_base - 0x10);
+	if (test != 0) return;
+	DWORD ptr = *(DWORD*)(esp_base - 0x8);
+	*len = *(DWORD*)(ptr + 8) << 1;
+	*data = ptr + 0xC;
+	*split = 0;
 }
 void InsertAB2TryHook()
 {
+	IthBreak();
 	MEMORY_WORKING_SET_LIST* list = GetWorkingSet();
 	if (list == 0) return;
 	ParseWorkingSet(list);
@@ -2296,7 +2301,7 @@ void InsertAB2TryHook()
 		{
 			if (*(DWORD*)i == 0x5044B70F)
 			{
-				if (*(BYTE*)(i+4) == 0xC) //movzx eax, word ptr [edx*2 + eax + 0xC]; wchar = string[i];
+				if (*(WORD*)(i + 4) == 0x890C) //movzx eax, word ptr [edx*2 + eax + 0xC]; wchar = string[i];
 				{
 					HookParam hp = {};
 					hp.addr = i;
@@ -2316,6 +2321,11 @@ found_ab2t:
 	i = 0;
 	NtFreeVirtualMemory(NtCurrentProcess(), (PVOID*)&list, &i, MEM_RELEASE);
 }
+/********************************************************************************************
+C4 hook: (Contributed by Stomp)
+	Game folder contains C4.EXE or XEX.EXE.
+
+********************************************************************************************/
 void InsertC4Hook()
 {
 	BYTE sig[8]={0x8A, 0x10, 0x40, 0x80, 0xFA, 0x5F, 0x88, 0x15};
@@ -2710,7 +2720,7 @@ DWORD DetermineNoHookEngine()
 }
 extern "C" DWORD __declspec(dllexport) DetermineEngineType()
 {
-	OutputConsole(L"Engine support module 2011.10.06");
+	OutputConsole(L"Engine support module 2011.10.15");
 	if (DetermineEngineByFile1()==0) return 0;
 	if (DetermineEngineByFile2()==0) return 0;
 	if (DetermineEngineByFile3()==0) return 0;
