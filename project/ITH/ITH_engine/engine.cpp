@@ -1,4 +1,4 @@
-/*  Copyright (C) 2010-2011  kaosu (qiupf2000@gmail.com)
+ï»¿/*  Copyright (C) 2010-2011  kaosu (qiupf2000@gmail.com)
  *  This file is part of the Interactive Text Hooker.
 
  *  Interactive Text Hooker is free software: you can redistribute it and/or
@@ -959,7 +959,7 @@ void InsertShinaHook()
 		buffer=text_buffer;
 		NtReadFile(hFile,0,0,0,&ios,buffer,0x1000,0,0);
 		NtClose(hFile);
-		version=strstr(buffer,"’Å–¼—¢");
+		version=strstr(buffer,"æ¤Žåé‡Œç·’");
 		if (version)
 		{
 			version=strstr(buffer,"InstallFiles");
@@ -1611,9 +1611,9 @@ CandySoft hook:
 	so there should a instruction like cmp reg,5B
 	Find this position and navigate to function entry.
 	The first parameter is the string pointer.
-	This approach works fine with game later than ‚Â‚æ‚«‚·‚QŠwŠú.
+	This approach works fine with game later than ã¤ã‚ˆãã™ï¼’å­¦æœŸ.
 
-	But the original ‚Â‚æ‚«‚· is quite different. I handle this case separately.
+	But the original ã¤ã‚ˆãã™ is quite different. I handle this case separately.
 
 ********************************************************************************************/
 void InsertCandyHook()
@@ -2107,7 +2107,7 @@ bool InsertIGSDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 			hp.length_offset=1;
 			hp.type=USING_UNICODE|USING_SPLIT;
 			NewHook(hp,L"IronGameSystem");
-			OutputConsole(L"IGS - Please set text(ƒeƒLƒXƒg) display speed(•\Ž¦‘¬“x) to fastest(uŠÔ)");
+			OutputConsole(L"IGS - Please set text(ãƒ†ã‚­ã‚¹ãƒˆ) display speed(è¡¨ç¤ºé€Ÿåº¦) to fastest(çž¬é–“)");
 			RegisterEngineType(ENGINE_IGS);
 			return true;
 		}
@@ -2184,9 +2184,9 @@ AkabeiSoft2Try hook:
 	The generated code sections do not belong to any module(exe/dll), hence they do not have 
 	a section name. So we can also exclude executable pages from all modules. At last, the code
 	section should be long(>0x2000). The remain address space should be several MB and can be
-	examined in reasonable time.
+	examined in reasonable time(less than 0.1s for P8400 Win7x64).
 	Characteristic sequence is 0F B7 44 50 0C, stands for movzx eax, word ptr [edx*2 + eax + C].
-	Obviously this instruction extract one unicode character from a string.
+	Obviously this instruction extracts one unicode character from a string.
 	A main shortcoming is that the code is not generated if it's not being used.
 	So if you are in title screen this approach will fail.
 
@@ -2288,6 +2288,8 @@ void SpecialHookAB2Try(DWORD esp_base, const HookParam& hp, DWORD* data, DWORD* 
 void InsertAB2TryHook()
 {
 	IthBreak();
+	//LARGE_INTEGER fre,beg,end;
+	//NtQueryPerformanceCounter(&beg,&fre);
 	MEMORY_WORKING_SET_LIST* list = GetWorkingSet();
 	if (list == 0) return;
 	ParseWorkingSet(list);
@@ -2319,6 +2321,11 @@ void InsertAB2TryHook()
 Make sure you have start the game and some text on the screen.");
 found_ab2t:
 	i = 0;
+	//NtQueryPerformanceCounter(&end,0);
+	//WCHAR search_time[0x40];
+	//end.QuadPart-=beg.QuadPart;
+	//swprintf(search_time,L"%.6lfs",(double)end.QuadPart/(double)fre.QuadPart);
+	//OutputConsole(search_time);
 	NtFreeVirtualMemory(NtCurrentProcess(), (PVOID*)&list, &i, MEM_RELEASE);
 }
 /********************************************************************************************
@@ -2679,7 +2686,7 @@ DWORD DetermineNoHookEngine()
 	}
 	if (IthFindFile(L"*.ykc"))
 	{
-		OutputConsole(L"HookSoft");
+		OutputConsole(L"HookSoft/Feng");
 		return 0;
 	}
 	if (IthFindFile(L"*.bsa"))
