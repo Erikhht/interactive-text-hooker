@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ITH_Profile>
+    <Game Title="七つのふしぎの終わるとき">
+        <File Name="七つのふしぎの終わるとき.exe">
+            <Hash SHA256="9BB47D6AD02F750A3AC2EEF795C8FC16F154F10BF4188C0D633E686333404CC3" />
+        </File>
+        <Profile>
+            <Threads>
+                <Thread HookName="QLIE" Context="50068e" SubContext="18fc34" Mask="3" Comment="会話" />
+                <Thread HookName="QLIE" Context="50068e" SubContext="18fa20" Mask="3" Comment="名前" />
+            </Threads>
+            <Links>
+                <Link From="1" To="0" />
+            </Links>
+            <Select ThreadIndex="0" />
+        </Profile>
+    </Game>
+</ITH_Profile>
