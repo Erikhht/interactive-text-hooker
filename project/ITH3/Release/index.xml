@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ITH_Manifest>
+  <Files>
+    <File Name="ITH_Engine.dll" SHA256="28893368A5835D0B317C61837D454415DADC0D0D10FCC62586D8F71FC8405C54" />
+  </Files>
+  <Folders>
+    <Folder Name="Profile" />
+  </Folders>
+</ITH_Manifest>
