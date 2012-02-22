@@ -1,23 +1,12 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <ITH_Profile>
-  <Game Title="星空のメモリア-Wish upon a shooting star-">
-    <File Name="Memoria.exe">
-      <Hash SHA256="C0304B2A93CCD55EE5863ECFC1A32B08EAB86C8F02102AB3018868B197ACD2CE" />
-    </File>
-    <Profile>
-      <Threads>
-        <Thread HookName="DrawTextA" Context="42815c" SubContext="0" Mask="3" />
-      </Threads>
-      <Select ThreadIndex="0" />
-    </Profile>
-  </Game>
   <Game Title="WHITE ALBUM2">
     <File Name="WA2.exe">
       <Hash SHA256="005E71107ED70E662C41CB526879CDCF0B9486E067C0E5A306308688C17409ED" />
     </File>
     <Profile>
       <Hooks>
-        <Hook Type="H" Code="/HB-4:-14@4383C0" Name="UserHook0" />
+        <Hook Type="H" Code="/HS-4:-14@4383C0" Name="UserHook0" />
       </Hooks>
       <Threads>
         <Thread HookName="UserHook0" Context="4492c1" SubContext="18fb58" Mask="3" Comment="名前" />
