@@ -22,9 +22,8 @@
 #include <intrin.h>
 #include <ITH\IHF.h>
 #include <ITH\IHF_SYS.h>
-#include <ITH\HookManager.h>
 #include <ITH\ITH_TLS.h>
-
+#include <ITH\HookManager.h>
 #define CMD_SIZE 0x200
 
 LPWSTR import_buffer;
@@ -55,7 +54,7 @@ extern HookManager* man;
 extern ProfileManager* pfman;
 extern CustomFilterMultiByte* mb_filter;
 extern CustomFilterUnicode* uni_filter;
-
+extern SettingManager* setman;
 #define COMMENT_BUFFER_LENGTH 0x200
 static WCHAR comment_buffer[COMMENT_BUFFER_LENGTH];
 
@@ -169,6 +168,8 @@ BOOL CALLBACK OptionDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					clipboard_flag = IsDlgButtonChecked(hDlg, IDC_CHECK3);
 					cyclic_remove = IsDlgButtonChecked(hDlg, IDC_CHECK4);
 					global_filter = IsDlgButtonChecked(hDlg, IDC_CHECK5);
+					setman->SetValue(SETTING_CLIPFLAG, clipboard_flag);
+					setman->SetValue(SETTING_SPLIT_TIME,split_time);
 					if (auto_inject == 0) auto_insert = 0;
 					ftwnd -> SetCommitFlag();
 				}

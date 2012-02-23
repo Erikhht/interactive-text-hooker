@@ -749,40 +749,7 @@ DWORD Hash(LPWSTR module, int length)
 	}
 	return hash;
 }
-static char clipboard_buffer[0x400];
-void CopyToClipboard(void* str,bool unicode, int len)
-{
-	if (clipboard_flag)
-	if (str)
-	{
-		int size=(len*2|0xF)+1;
-		if (len>=0x3FE) return;
-		memcpy(clipboard_buffer,str,len);
-		*(WORD*)(clipboard_buffer+len)=0;
-		HGLOBAL hCopy;
-		LPWSTR copy;
-		if (OpenClipboard(0))
-		{
-			if (hCopy=GlobalAlloc(GMEM_MOVEABLE,size))
-			{
-				if (copy=(LPWSTR)GlobalLock(hCopy))
-				{
-					if (unicode)
-					{
-						memcpy(copy,clipboard_buffer,len+2);
-					}
-					else
-						copy[MB_WC(clipboard_buffer,copy)]=0;					
-					GlobalUnlock(hCopy);
-					EmptyClipboard();
-					SetClipboardData(CF_UNICODETEXT,hCopy);
-					
-				}
-			}
-			CloseClipboard();
-		}
-	}
-}
+
 DWORD	GetCurrentPID()
 {
 	return man->GetCurrentPID();

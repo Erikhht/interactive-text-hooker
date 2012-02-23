@@ -324,7 +324,8 @@ int main()
 
 		LoadSettings();
 		setman->SetValue(SETTING_SPLIT_TIME,split_time);
-		setman->SetValue(SETTING_CYCLIC_REMOVE,cyclic_remove);
+		//setman->SetValue(SETTING_CYCLIC_REMOVE,cyclic_remove);
+		setman->SetValue(SETTING_CLIPFLAG,clipboard_flag);
 		hIns = GetModuleBase();
 		MyRegisterClass(hIns);
 		InitCommonControls();
