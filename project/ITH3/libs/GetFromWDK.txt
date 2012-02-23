@@ -1,0 +1,2 @@
+msvcrt.lib, rename to msvcrt_native.lib
+ntdll.lib
