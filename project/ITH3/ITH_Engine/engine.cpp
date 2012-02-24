@@ -1898,11 +1898,34 @@ void InsertPensilHook()
 				hp.off = 8;
 				hp.length_offset = 1;
 				NewHook(hp,L"Pencil");
+				return;
 				//RegisterEngineType(ENGINE_PENSIL);
 			}
 		}
 	}
 	OutputConsole(L"Unknown Pensil engine.");
+}
+bool IsPensilSetup()
+{
+	HANDLE hFile = IthCreateFile(L"PSetup.exe",FILE_READ_DATA, FILE_SHARE_READ, FILE_OPEN);
+	FILE_STANDARD_INFORMATION info;
+	IO_STATUS_BLOCK ios;
+	LPVOID buffer = 0;
+	NtQueryInformationFile(hFile, &ios, &info, sizeof(info), FileStandardInformation);
+	NtAllocateVirtualMemory(NtCurrentProcess(), &buffer, 0,
+		&info.AllocationSize.LowPart, MEM_COMMIT, PAGE_READWRITE);
+	NtReadFile(hFile, 0,0,0, &ios, buffer, info.EndOfFile.LowPart, 0, 0);
+	NtClose(hFile);
+	BYTE* b = (BYTE*)buffer;
+	bool result = 0;
+	DWORD len = info.EndOfFile.LowPart & ~1;
+	if (len == info.AllocationSize.LowPart) len-=2;
+	b[len] = 0;
+	b[len + 1] = 0;
+	if (wcsstr((LPWSTR)buffer, L"PENSIL")) result = 1;
+	else if (wcsstr((LPWSTR)buffer, L"Pensil")) result =1;
+	NtFreeVirtualMemory(NtCurrentProcess(), &buffer, &info.AllocationSize.LowPart, MEM_RELEASE);
+	return result;
 }
 void SpecialHookDebonosu(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
 {
@@ -2662,7 +2685,8 @@ DWORD DetermineEngineByFile3()
 		InsertTriangleHook();
 		return 0;
 	}
-	if (IthCheckFile(L"pencil_production.mpg"))
+	//if (IthFindFile(L"pencil*.mpg"))
+	if (IthCheckFile(L"PSetup.exe"))
 	{
 		InsertPensilHook();
 		return 0;

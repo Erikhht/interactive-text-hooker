@@ -517,6 +517,7 @@ void IthInitSystemService()
 		NtCreateSection(&codepage_section,SECTION_MAP_READ,&oa,0,PAGE_READONLY,SEC_COMMIT,codepage_file);
 		NtClose(codepage_file); 
 		size=0;
+		page=0;
 		NtMapViewOfSection(codepage_section,NtCurrentProcess(),&page,0,0,0,&size,ViewUnmap,0,PAGE_READONLY);
 	}
 

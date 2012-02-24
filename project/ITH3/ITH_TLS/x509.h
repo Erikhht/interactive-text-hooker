@@ -19,7 +19,7 @@
 #define ITH_X509
 
 //Main purpose: to extract public modulus from certificate.
-//Do not verify certificate.
+//Do not verify certificate. So man-in-the-middle attack will success.
 
 class ASN1Object
 {
