@@ -1888,7 +1888,7 @@ void InsertPensilHook()
 	DWORD i,j;
 	for (i = module_base; i < module_limit - 4; i++)
 	{
-		if (*(DWORD*)i == 0x63813D) //cmp eax,8163
+		if (*(DWORD*)i == 0x6381) //cmp *,8163
 		{
 			j = FindEntryAligned(i,0x100);
 			if (j)
