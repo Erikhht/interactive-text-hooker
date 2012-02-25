@@ -85,6 +85,7 @@
       <AdditionalDependencies>ITH_SYS.lib;ntdll.lib;msvcrt_native.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>
       <EntryPointSymbol>DllMain</EntryPointSymbol>
+      <DataExecutionPrevention>false</DataExecutionPrevention>
     </Link>
     <PostBuildEvent>
       <Command>$(SolutionDir)DLL_PostBuild $(SolutionDir) $(ProjectName)</Command>

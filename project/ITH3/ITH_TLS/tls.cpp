@@ -315,7 +315,6 @@ int SecureSocket::recv(void* data, int len)
 }
 int SecureSocket::send_type( void* data, int len, unsigned char type )
 {
-	
 	SHA1Calc sha1;
 	int i,pad_len,pad, original_len;
 	unsigned char tmp[0x8];
@@ -327,32 +326,36 @@ int SecureSocket::send_type( void* data, int len, unsigned char type )
 	while (len > 0x3E0)
 	{
 		HMAC_Calc mac(get_key_block()->client_mac,HASH_SIZE_SHA1,&sha1);
-		//mac->HMAC_Init(get_key_block()->client_mac,HASH_SIZE_SHA1,&sha1);
-		for (i = 0; i < 8; i++)
-			tmp[7 - i] = sequence[i];
+
+		*(unsigned long*)tmp = _byteswap_ulong(sequence[1]);
+		*(unsigned long*)(tmp + 4) = _byteswap_ulong(sequence[0]);
+
 		mac.HMAC_Update(tmp,8);
 		tmp[0] = type;
-		tmp[1] = 3; tmp[2] = 1;
-		tmp[3] = 0x3; tmp[4] = 0xE0;
-		mac.HMAC_Update(tmp, 5);
+		tmp[1] = SSL_VERSION_MAJOR; 
+		tmp[2] = SSL_VERSION_MINOR;
+		tmp[3] = 0x3; 
+		tmp[4] = 0xE0;
+		mac.HMAC_Update(tmp, SSL_RECORD_HEADER_LENGTH);
 		mac.HMAC_Update(d, 0x3E0);
 		tmp[3] = 0x4; tmp[4] = 0;
-		TransportSocket::send(tmp,5);
-		//::send(sock, tmp, 5, 0);		
-		for (i = 0; i < 0x3E0; i+= 0x10)
+		TransportSocket::send(tmp,SSL_RECORD_HEADER_LENGTH);
+
+		for (i = 0; i < 0x3E0; i+= AES256_BLOCK_SIZE)
 			cipher->Encrypt(d + i, buffer + i);		
 		mac.HMAC_Final(buffer + 0x3E0);
-		memset(buffer + 0x3F4, 0xB, 0xC);
+		memset(buffer + 0x3F4, 0xB, 0xC); //400-3E0-14(SHA1) = 0xC padding bytes (0xB)
 		TransportSocket::send(buffer, 0x400);
+
 		rcb.send_seq++;
 		d += 0x3E0;
 		len -= 0x3E0;
 	}
 	HMAC_Calc mac(get_key_block()->client_mac,HASH_SIZE_SHA1,&sha1);
-	//mac->HMAC_Init(get_key_block()->client_mac,HASH_SIZE_SHA1,&sha1);
+
 	*(unsigned long*)tmp = _byteswap_ulong(sequence[1]);
 	*(unsigned long*)(tmp + 4) = _byteswap_ulong(sequence[0]);
-	//for (i = 0; i < 8; i++) tmp[7 - i] = sequence[i];
+
 	mac.HMAC_Update(tmp,8);
 	tmp[0] = type;
 	tmp[1] = 3; tmp[2] = 1;
@@ -365,17 +368,17 @@ int SecureSocket::send_type( void* data, int len, unsigned char type )
 	tmp[3] = (pad_len >> 8) & 0xFF;
 	tmp[4] = pad_len & 0xFF;
 	
-	len -= 0x10;
-	for (i = 0; i < len; i += 0x10)
+	len -= AES256_BLOCK_SIZE;
+	for (i = 0; i < len; i += AES256_BLOCK_SIZE)
 		cipher->Encrypt(d + i, buffer + i);
-	len += 0x10;
+	len += AES256_BLOCK_SIZE;
 	memcpy(buffer + i, d + i, len - i);
 	mac.HMAC_Final(buffer + len);
 	memset(buffer + len + HASH_SIZE_SHA1, pad - 1, pad);
-	for (; i < pad_len; i += 0x10)
+	for (; i < pad_len; i += AES256_BLOCK_SIZE)
 		cipher->Encrypt(buffer + i, buffer + i);
 	rcb.send_seq++;
-	TransportSocket::send(tmp, 5);
+	TransportSocket::send(tmp, SSL_RECORD_HEADER_LENGTH);
 	if (TransportSocket::send(buffer, pad_len) == pad_len)
 		return original_len;
 	else return -1;
@@ -404,7 +407,7 @@ int SecureSocket::get_record()
 			if (tmp[0] == 1) return 0;
 		}
 	}
-	if (tmp[1] != 3 || tmp[2] != 1) return -1;
+	if (tmp[1] != SSL_VERSION_MAJOR || tmp[2] != SSL_VERSION_MINOR) return -1;
 	unsigned int len = _byteswap_ushort(*(unsigned short*)(tmp + 3));
 	if (len & 0xF) return -1;
 
@@ -419,7 +422,7 @@ int SecureSocket::get_record()
 	ret = recv_full(buffer, len);
 	if (ret <= 0) return ret;
 	unsigned int i;
-	for (i = 0; i < len; i+= 0x10)
+	for (i = 0; i < len; i+= AES256_BLOCK_SIZE)
 		decryptor->Decrypt(buffer + i, buffer + i);
 
 	char pad = buffer[len - 1];
@@ -432,7 +435,7 @@ int SecureSocket::get_record()
 
 	tmp[3] = (rcb.expect_recv >> 8) & 0xFF;
 	tmp[4] = rcb.expect_recv & 0xFF;
-	mac.HMAC_Update(tmp, 5);
+	mac.HMAC_Update(tmp, SSL_RECORD_HEADER_LENGTH);
 	mac.HMAC_Update(buffer, rcb.expect_recv);
 	mac.HMAC_Final(tmp);
 	if (memcmp(tmp,buffer + rcb.expect_recv, HASH_SIZE_SHA1) == 0)
@@ -688,7 +691,7 @@ int SecureSocket::handshake()
 
 	get_encryptor()->Init(key->client_write, key->client_iv);
 	get_decryptor()->Init(key->server_write, key->server_iv);
-		
+	
 	md5.HashFinal(buffer);
 	sha1.HashFinal(buffer + HASH_SIZE_MD5);
 		

@@ -85,6 +85,7 @@
       <AdditionalDependencies>IHF_DLL.lib;ITH_SYS.lib;msvcrt_native.lib;ntdll.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>
       <EntryPointSymbol>DllMain</EntryPointSymbol>
+      <DataExecutionPrevention>false</DataExecutionPrevention>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

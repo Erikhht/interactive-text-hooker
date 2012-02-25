@@ -57,15 +57,124 @@ LARGE_INTEGER* GetTimeBias()
 {
 	__asm mov eax,0x7ffe0020
 }
-__declspec(naked) void ThreadStart()
+/*__declspec(naked) void normal_asm()
 {
-	__asm{
+	__asm
+	{
+		push ecx
+		push edx
+		mov fs:[0],esp
+		push ebp
 		call eax
+_terminate:
 		push eax
 		push -2
-		push eax
+		call dword ptr [NtTerminateThread]
+	}
+}*/
+
+/*
+__declspec(naked) void RegToStrAsm()
+{
+	__asm
+	{
+		mov edx, 8
+_cvt_loop:
+		mov eax, ecx
+		and eax, 0xF
+		cmp eax, 0xA
+		jb _below_ten
+		add al,7
+_below_ten:
+		add al,0x30
+		stosw
+		ror ecx,4
+		dec edx
+		jne _cvt_loop
+		retn
 	}
 }
+__declspec(naked) void except_asm()
+{
+	__asm
+	{
+		mov eax,[esp + 4]
+		xor esi,esi
+		mov ebp,[eax]
+		mov ecx,[esp + 0xC]
+		mov ebx,[ecx + 0xB8]
+		sub esp,0x240
+		lea edi,[esp + 0x40]
+		mov eax,esp
+		push esi
+		push 0x1C
+		push eax
+		push esi
+		push ebx
+		push -1
+		call dword ptr [NtQueryVirtualMemory]
+		test eax,eax
+		jne _terminate
+		mov eax,esp
+		push eax
+		push 0x200
+		push edi
+		push 2
+		push ebx
+		push -1
+		call dword ptr [NtQueryVirtualMemory]
+		test eax,eax
+		jne _terminate
+		pop esi
+		xadd edi,esi
+		std
+		mov al,0x5C
+		repen scasw
+		mov word ptr [edi + 2], 0x3A
+		mov ecx,ebx
+		sub ecx,[esp]
+		call RegToStrAsm
+		inc edi
+		inc edi
+		xchg esi,edi
+		mov ecx,ebp
+		call RegToStrAsm
+		inc edi
+		inc edi
+		xor eax,eax
+		mov [edi + 0x10], eax
+		push 0
+		push edi
+		push esi
+		push 0
+		call dword ptr [MessageBoxW]
+		or eax, -1
+		jmp _terminate
+	}
+}
+*/
+
+BYTE normal_routine[0x14] = {
+	0x51,0x52,0x64,0x89,0x23,0x55,0xFF,0xD0,0x50,0x6A,0xFE,0xFF,0x15,0x14,0x00,0x00,0x00
+};
+
+BYTE except_routine[0xe0] = {
+	0xBA,0x08,0x00,0x00,0x00,0x8B,0xC1,0x83,0xE0,0x0F,0x83,0xF8,0x0A,0x72,0x02,0x04,
+	0x07,0x04,0x30,0x66,0xAB,0xC1,0xC9,0x04,0x4A,0x75,0xEA,0xC3,0x00,0x00,0x00,0x00,
+	0x8B,0x44,0xE4,0x04,0x31,0xF6,0x8B,0x28,0x8B,0x4C,0xE4,0x0C,0x8B,0x99,0xB8,0x00,
+	0x00,0x00,0x81,0xEC,0x40,0x02,0x00,0x00,0x8D,0x7C,0xE4,0x40,0x89,0xE0,0x56,0x6A,
+	0x1C,0x50,0x56,0x53,0x6A,0xFF,0xFF,0x15,0x18,0x00,0x00,0x00,0x85,0xC0,0x75,0x98,
+	0x89,0xE0,0x50,0x68,0x00,0x02,0x00,0x00,0x57,0x6A,0x02,0x53,0x6A,0xFF,0xFF,0x15,
+	0x18,0x00,0x00,0x00,0x85,0xC0,0x75,0xe6,0x5E,0x0F,0xC1,0xF7,0xFD,0xB0,0x5C,0x66,
+	0xF2,0xAF,0x66,0xC7,0x47,0x02,0x3A,0x00,0x89,0xD9,0x2B,0x0C,0xE4,0xE8,0x7E,0xFF,
+	0xFF,0xFF,0x47,0x47,0x87,0xFE,0x89,0xE9,0xE8,0x73,0xFF,0xFF,0xFF,0x47,0x47,0x31,
+	0xC0,0x89,0x47,0x10,0x6A,0x00,0x57,0x56,0x6A,0x00,0xFC,0xFF,0x15,0x1C,0x00,0x00,
+	0x00,0x83,0xC8,0xFF,0xEB,0xBE
+};
+#define ADDR0 0xD
+#define	ADDR1 0x48
+#define ADDR2 0x60
+#define ADDR3 0x9D
 class ThreadStartManager
 {
 public:
@@ -93,19 +202,34 @@ public:
 		len=0x1000;
 		NtAllocateVirtualMemory(hProc,(PVOID*)(proc_record+count),0,&len,
 			MEM_COMMIT,PAGE_EXECUTE_READWRITE);
-		addr=proc_record[count];
-		proc_record[count]|=pid;
-		BYTE buffer[0x20],*fun,*pt;
-		memcpy(buffer,ThreadStart,0x6);
-		buffer[6] = 0xB8;
-		fun = (BYTE*)NtTerminateThread+1;
-		pt = buffer + 7;
-		while (*fun != 0xB8) *pt++ = *fun++;
-
-		NtWriteVirtualMemory(hProc,(PVOID)addr,buffer,pt - buffer,&len);
+		DWORD base = proc_record[count];
+		proc_record[count] |= pid;
+		union
+		{
+			LPVOID buffer;
+			DWORD b;
+		};
+		b = base;
+		LPVOID fun_table[3];
+		*(DWORD*)(normal_routine + ADDR0) += base;
+		NtWriteVirtualMemory(hProc, buffer, normal_routine, 0x10, 0);
+		*(DWORD*)(normal_routine + ADDR0) -= base;
+		b += 0x14;
+		fun_table[0] = NtTerminateThread;
+		fun_table[1] = NtQueryVirtualMemory;
+		fun_table[2] = MessageBoxW;
+		NtWriteVirtualMemory(hProc, buffer, fun_table, 0xC, 0);
+		b += 0xC;
+		*(DWORD*)(except_routine + ADDR1) += base;
+		*(DWORD*)(except_routine + ADDR2) += base;
+		*(DWORD*)(except_routine + ADDR3) += base;
+		NtWriteVirtualMemory(hProc, buffer, except_routine, 0xE0, 0);
+		*(DWORD*)(except_routine + ADDR1) -= base;
+		*(DWORD*)(except_routine + ADDR2) -= base;
+		*(DWORD*)(except_routine + ADDR3) -= base;
 		count++;
 		ReleaseLock();
-		return (LPVOID)addr;
+		return (LPVOID)base;
 	}
 	void ReleaseProcessMemory(HANDLE hProc)
 	{
@@ -160,7 +284,7 @@ public:
 			if (NT_SUCCESS(NtOpenProcess(&hProc,PROCESS_VM_OPERATION|PROCESS_VM_READ,&oa,&id)))	
 			{
 				if (NT_SUCCESS(NtReadVirtualMemory(hProc,(PVOID)addr,buffer,8,&len)))
-					if (memcmp(buffer,ThreadStart,4)==0) flag=1;
+					if (memcmp(buffer,normal_routine,4)==0) flag=1;
 				NtClose(hProc);
 			}
 			if (flag==0)
@@ -527,7 +651,7 @@ void IthInitSystemService()
 	size=0;
 	NtMapViewOfSection(thread_man_section,NtCurrentProcess(),
 		(PVOID*)&thread_man,0,0,0,&size,ViewUnmap,0,PAGE_EXECUTE_READWRITE);
-	//thread_man_mutex=IthCreateMutex(L"ITH_ThreadMan",0);
+
 }
 
 //Release resources allocated by IthInitSystemService.
@@ -830,7 +954,7 @@ HANDLE IthCreateThread(LPVOID start_addr, DWORD param, HANDLE hProc)
 	DWORD size=DEFAULT_STACK_LIMIT,commit=DEFAULT_STACK_COMMIT,x;
 	if (!NT_SUCCESS(NtAllocateVirtualMemory(hProc,&stack.ExpandableStackBottom,
 		0,&size,MEM_RESERVE,PAGE_READWRITE))) return INVALID_HANDLE_VALUE;
-	
+
 	stack.ExpandableStackBase=(char*)stack.ExpandableStackBottom+size;
 	stack.ExpandableStackLimit=(char*)stack.ExpandableStackBase-commit;
 	size=PAGE_SIZE;
@@ -845,18 +969,21 @@ HANDLE IthCreateThread(LPVOID start_addr, DWORD param, HANDLE hProc)
 	ctx.SegSs=0x20;
 	ctx.SegCs=0x18;
 	ctx.EFlags=0x3000;
-	ctx.Eax=(DWORD)start_addr;
-	ctx.Esp=(DWORD)stack.ExpandableStackBase-0x10;
-	
-	//NtWaitForSingleObject(thread_man_mutex,0,0);
 	ctx.Eip=(DWORD)thread_man->GetProcAddr(hProc);
+	ctx.Eax=(DWORD)start_addr;
+	ctx.Ecx=ctx.Eip + 0x40;
+	ctx.Edx=0xFFFFFFFF;
+	ctx.Esp=(DWORD)stack.ExpandableStackBase-0x10;
+	ctx.Ebp=param;
+	//NtWaitForSingleObject(thread_man_mutex,0,0);
+
 	//NtReleaseMutant(thread_man_mutex,0);
 
-	if (NT_SUCCESS(NtCreateThread(&hThread,THREAD_ALL_ACCESS,0,hProc,&id,&ctx,&stack,1)))
+	if (NT_SUCCESS(NtCreateThread(&hThread,THREAD_ALL_ACCESS,0,hProc,&id,&ctx,&stack,false)))
 	{
-		NtGetContextThread(hThread,&ctx);
-		NtWriteVirtualMemory(hProc,(LPVOID)ctx.Esp,&param,4,&size);
-		NtResumeThread(hThread,0);
+		//NtGetContextThread(hThread,&ctx);
+		//NtWriteVirtualMemory(hProc,(LPVOID)ctx.Esp,&param,4,&size);
+		//NtResumeThread(hThread,0);
 		return hThread;
 	}
 	return INVALID_HANDLE_VALUE;
