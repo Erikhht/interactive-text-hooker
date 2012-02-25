@@ -212,7 +212,7 @@ public:
 		b = base;
 		LPVOID fun_table[3];
 		*(DWORD*)(normal_routine + ADDR0) += base;
-		NtWriteVirtualMemory(hProc, buffer, normal_routine, 0x10, 0);
+		NtWriteVirtualMemory(hProc, buffer, normal_routine, 0x14, 0);
 		*(DWORD*)(normal_routine + ADDR0) -= base;
 		b += 0x14;
 		fun_table[0] = NtTerminateThread;
