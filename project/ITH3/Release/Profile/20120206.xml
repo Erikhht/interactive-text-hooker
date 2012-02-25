@@ -18,18 +18,4 @@
       <Select ThreadIndex="1" />
     </Profile>
   </Game>
-  <Game Title="ティンクル☆くるせいだーす ＰＳＳ">
-    <File Name="KURU2PSS.exe">
-      <Hash SHA256="F8AB6D02D4F38AF0CBF86101176D052E2652F29295BEBFF13E448E1D8D2F4892" />
-    </File>
-    <Profile>
-      <Hooks>
-        <Hook Type="H" Code="/HS8@4CDB20" Name="UserHook0" />
-      </Hooks>
-      <Threads>
-        <Thread HookName="UserHook0" Context="49c898" SubContext="0" Mask="3" />
-      </Threads>
-      <Select ThreadIndex="0" />
-    </Profile>
-  </Game>
 </ITH_Profile>
