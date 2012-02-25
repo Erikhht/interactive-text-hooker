@@ -95,7 +95,6 @@
     <ClCompile Include="hmac.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="prng.cpp" />
-    <ClCompile Include="rsa.cpp" />
     <ClCompile Include="sha.cpp" />
     <ClCompile Include="socket.cpp" />
     <ClCompile Include="tls.cpp" />
@@ -106,7 +105,6 @@
     <ClInclude Include="arithmetic.h" />
     <ClInclude Include="hmac.h" />
     <ClInclude Include="prng.h" />
-    <ClInclude Include="rsa.h" />
     <ClInclude Include="sha.h" />
     <ClInclude Include="sizedef.h" />
     <ClInclude Include="socket.h" />
