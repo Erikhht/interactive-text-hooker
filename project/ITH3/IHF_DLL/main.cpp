@@ -192,12 +192,17 @@ DWORD IHFAPI NewHook(const HookParam& hp, LPWSTR name, DWORD flag)
 	current=current_available-hookman;
 	if (current>=MAX_HOOK) OutputConsole(L"Too many hooks.");
 	else {
-		if (name==0 || *name == 0)
+		flag &= 0xFFFF;
+		if ((flag & HOOK_AUXILIARY) == 0)
 		{
-			name=str;
-			swprintf(name,L"UserHook%d",user_hook_count++);
+			flag |= HOOK_ADDITIONAL;
+			if (name==0 || *name == 0)
+			{
+				name=str;
+				swprintf(name,L"UserHook%d",user_hook_count++);
+			}
 		}
-		hookman[current].InitHook(hp,name,HOOK_ADDITIONAL|(flag&0xFFFF));
+		hookman[current].InitHook(hp,name,flag);
 		if (hookman[current].InsertHook()==0)
 		{
 			OutputConsole(L"Additional hook inserted.");

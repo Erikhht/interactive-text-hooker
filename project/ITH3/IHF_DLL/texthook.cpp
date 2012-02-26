@@ -126,28 +126,38 @@ static EXCEPTION_DISPOSITION ExceptHandler(EXCEPTION_RECORD *ExceptionRecord,
 	ContextRecord->Eip=recv_addr;
 	return ExceptionContinueExecution;
 }
+__declspec (naked) void SafeExit() //Return to eax
+{
+	__asm
+	{
+		mov [esp + 0x24], eax
+		popfd
+		popad
+		retn
+	}
+}
 __declspec(naked) int ProcessHook(DWORD dwDataBase, DWORD dwRetn,TextHook *hook)
 	//Use SEH to ensure normal execution even bad hook inserted.
 {
 	__asm
 	{
-		push 0
-			mov eax,seh_recover
-			mov recv_addr,eax
-			push ExceptHandler
-			push fs:[0]
+		mov eax,seh_recover
+		mov recv_addr,eax
+		push ExceptHandler
+		push fs:[0]
 		mov recv_esp,esp
-			mov fs:[0],esp
-			push esi
-			push edx
-			call TextHook::Send
-			inc dword ptr [esp+0x8]
+		mov fs:[0],esp
+		push esi
+		push edx
+		call TextHook::Send
+		test eax,eax
+		jz seh_recover
+		mov ecx,SafeExit
+		mov [esp + 0x8], ecx //change exit point.
 seh_recover:
-		mov eax,[esp]
-		mov fs:[0],eax
-			add esp,8
-			pop eax
-			retn
+		pop dword ptr fs:[0]
+		pop ecx
+		retn
 	}
 }
 
@@ -159,14 +169,14 @@ bool HookFilter(DWORD retn)
 	return false;
 }
 #define SMALL_BUFF_SIZE 0x80
-void TextHook::Send(DWORD dwDataBase, DWORD dwRetn)
+DWORD TextHook::Send(DWORD dwDataBase, DWORD dwRetn)
 {
 	DWORD dwCount,dwAddr,dwDataIn,dwSplit=0;
 	BYTE *pbData, pbSmallBuff[SMALL_BUFF_SIZE];
 	DWORD dwType=hp.type;
-	if (!live) return;
+	if (!live) return 0;
 	if ((dwType&NO_CONTEXT)==0)
-		if (HookFilter(dwRetn)) return;
+		if (HookFilter(dwRetn)) return 0;
 	dwCount=0;
 	dwAddr=hp.addr;
 	if (trigger)
@@ -175,17 +185,28 @@ void TextHook::Send(DWORD dwDataBase, DWORD dwRetn)
 			trigger=InsertDynamicHook((LPVOID)dwAddr,*(DWORD*)(dwDataBase-0x1C),*(DWORD*)(dwDataBase-0x18));
 		else trigger=0;
 	}
+	if (dwType & HOOK_AUXILIARY)
+	{
+		//Clean hook when dynamic hook finished.
+		//AUX hook is only used for a foothold of dynamic hook.
+		if (trigger == 0)
+		{
+			ClearHook();
+			return dwAddr;
+		}
+		return 0;
+	}
 	dwDataIn=*(DWORD*)(dwDataBase+hp.off);
 	if (dwType&EXTERN_HOOK) 
 	{
 		DataFun fun=(DataFun)hp.extern_fun;
 		fun(dwDataBase,hp,&dwDataIn,&dwSplit,&dwCount);
-		if (dwCount==0 || dwCount > 0x10000) return;
+		if (dwCount==0 || dwCount > 0x10000) return 0;
 	}
 	else
 	{
 		dwSplit=0;
-		if (dwDataIn==0) return;
+		if (dwDataIn==0) return 0;
 		if (dwType&USING_SPLIT)
 		{
 			dwSplit=*(DWORD*)(dwDataBase+hp.split);
@@ -193,14 +214,14 @@ void TextHook::Send(DWORD dwDataBase, DWORD dwRetn)
 			{
 				if (IthGetMemoryRange((LPVOID)(dwDataIn+hp.split_ind),0,0))
 					dwSplit=*(DWORD*)(dwSplit+hp.split_ind);
-				else return;
+				else return 0;
 			}
 		}
 		if (dwType&DATA_INDIRECT)
 		{
 			if (IthGetMemoryRange((LPVOID)(dwDataIn+hp.ind),0,0))
 				dwDataIn=*(DWORD*)(dwDataIn+hp.ind);
-			else return;
+			else return 0;
 		}
 		if (dwType&PRINT_DWORD) 
 		{
@@ -240,6 +261,7 @@ void TextHook::Send(DWORD dwDataBase, DWORD dwRetn)
 		}
 	}
 	if (pbData!=pbSmallBuff) delete pbData;
+	return 0;
 }
 int MapInstruction(DWORD original_addr, DWORD new_addr, BYTE& hook_len, BYTE& original_len)
 {
@@ -516,11 +538,19 @@ int TextHook::ClearHook()
 }
 int TextHook::ModifyHook(const HookParam& hp)
 {
-	WCHAR name[0x40];
-	wcscpy(name,hook_name);
+	//WCHAR name[0x40];
+	DWORD len = 0;
+	if (hook_name) len = wcslen(hook_name);
+	LPWSTR name = 0;
+	if (len)
+	{
+		name = new WCHAR[len + 1];
+		wcscpy(name,hook_name);
+	}
 	ClearHook();
 	InitHook(hp,name);
 	InsertHook();
+	if (name) delete name;
 	return 0;
 }
 int TextHook::RecoverHook()

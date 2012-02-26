@@ -1010,9 +1010,10 @@ void SpecialHookShina(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, 
 		*len=skip;
 	}
 }
-void InsertShinaHook()
+bool InsertShinaHook()
 {
 	HANDLE hFile=IthCreateFile(L"setup.ini",FILE_READ_DATA,FILE_SHARE_READ,FILE_OPEN);
+	bool flag = false;
 	if (hFile!=INVALID_HANDLE_VALUE)
 	{
 		IO_STATUS_BLOCK ios;
@@ -1043,7 +1044,7 @@ void InsertShinaHook()
 			small_buffer[0x3F]=0;
 			version=strstr(small_buffer,"v2.");
 			ver=0;
-			sscanf(version+0x3,"%d",&ver);
+			if (1 == sscanf(version+0x3,"%d",&ver)) flag = true;
 			if (ver>40)
 			{
 				HookParam hp={};
@@ -1078,6 +1079,7 @@ void InsertShinaHook()
 			OutputConsole(L"Unknown ShinaRio engine");
 		}
 	}
+	return flag;
 }
 bool InsertWaffleDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 {
@@ -2231,9 +2233,9 @@ bool InsertIGSDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 }
 void InsertIronGameSystemHook()
 {
-	OutputConsole(L"Probably IronGameSystem. Wait for text.");
-	SwitchTrigger(true);
+	OutputConsole(L"Probably IronGameSystem. Wait for text.");	
 	trigger_fun=InsertIGSDynamicHook;
+	SwitchTrigger(true);
 }
 
 int cmp(const void * a, const void * b)
@@ -2450,37 +2452,73 @@ void InsertTanukiHook()
 	}
 	OutputConsole(L"Unknown TanukiSoft engine.");
 }
-struct GIGA_FONT
+DWORD FindNextCall(DWORD start, DWORD range, DWORD base, DWORD limit, DWORD* fun)
 {
-	DWORD not_used1[25];
-	DWORD data;
-	DWORD not_used2;
-	DWORD font_size;
-	DWORD not_used3;
-	DWORD font_type;
-};
-/*void SpecialHookGIGA(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
-{
-	GIGA_FONT *f = *(GIGA_FONT**)(esp_base - 0xC);
-	*data = f->data;
-	*split = (f->font_type << 8) | f->font_size;
-	*len = LeadByteTable[f->data&0xFF];
-}
-void InsertGIGAHook()
-{
-	HookParam hp = {};
-	hp.addr = FindCallAndEntryAbs((DWORD)GetGlyphOutlineA,module_limit-module_base,module_base,0xFF6A);
-	if (hp.addr)
+	DWORD j, k;
+	union
 	{
-		hp.extern_fun = (DWORD)SpecialHookGIGA;
-		hp.type = USING_SPLIT | EXTERN_HOOK;
-		hp.length_offset = 1;
-		NewHook(hp,L"GIGA");
-		//RegisterEngineType(ENGIEN_GIGA);
+		DWORD i;
+		DWORD* id;
+		BYTE* ib;
+	};
+	j = start + range;
+	for (i = start; i < j; i++)
+	{
+		if (*ib == 0xE8)
+		{
+			i++;
+			k = i + 4 + *id;
+			if (k > base && k < limit)
+			{
+				if (fun) *fun = k;
+				return i + 4;
+			}
+		}
 	}
-	else
-		OutputConsole(L"Unknown GIGA engine.");
-}*/
+	return 0;
+}
+bool InsertRyokuchaDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
+{
+	if (addr != IsDBCSLeadByte) return false;
+	DWORD retn = *(DWORD*)(stack + 4);
+	DWORD next, fun, base,limit;
+	if (FillRange(process_name, &base, &limit))
+	{
+		next = FindNextCall(retn, 0x40, base, limit, &fun);
+		if (next)
+		{
+			next = FindNextCall(fun, 0x40, base, limit, &fun);
+			if (next)
+			{
+				next = FindNextCall(fun, 0x40, base, limit, &fun);
+				if (next)
+				{
+					next = FindNextCall(next, 0x40, base, limit, &fun);
+					if (next)
+					{
+						HookParam hp;
+						hp.addr = fun;
+						hp.off = 8;
+						hp.type = BIG_ENDIAN;
+						hp.length_offset = 1;
+						NewHook(hp, L"StudioRyokucha");
+						return true;
+					}
+				}
+			}
+		}
+	}
+	OutputConsole(L"Unknown Ryokucha engine.");
+	return true;
+}
+void InsertRyokuchaHook()
+{
+	OutputConsole(L"Probably Ryokucha. Wait for text.");
+	trigger_fun = InsertRyokuchaDynamicHook;
+	HookParam hp = {(DWORD)IsDBCSLeadByte};
+	NewHook(hp, 0, HOOK_AUXILIARY);
+	SwitchTrigger(true);
+}
 DWORD InsertDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 {
 	return !trigger_fun(addr,frame,stack);
@@ -2563,11 +2601,11 @@ DWORD DetermineEngineByFile1()
 			InsertCircusHook2();
 		return 0;
 	}
-	if (IthFindFile(L"*.war"))
+	/*if (IthFindFile(L"*.war"))
 	{
-		InsertShinaHook();
-		return 0;
-	}
+		if (InsertShinaHook())
+			return 0;
+	}*/
 	if (IthFindFile(L"*.noa"))
 	{
 		InsertCotophaHook();
@@ -2769,6 +2807,13 @@ DWORD DetermineEngineByProcessName()
 		InsertShinaHook();
 		return 0;
 	}
+	static WCHAR saveman[] = L"_saveman.exe";
+	wcscpy(str+len-4,saveman);
+	if (IthCheckFile(str))
+	{
+		InsertRyokuchaHook();
+		return 0;
+	}
 	return 1;
 }
 DWORD DetermineEngineOther()
@@ -2790,6 +2835,7 @@ DWORD DetermineEngineOther()
 			return 0;
 		}
 	}
+	GetModuleBase();
 	if (IthGetFileInfo(L"*01",static_file_info))
 	{	
 		if (*(DWORD*)static_file_info==0)

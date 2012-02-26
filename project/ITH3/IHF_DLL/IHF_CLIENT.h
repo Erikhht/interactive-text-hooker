@@ -49,7 +49,7 @@ public:
 	int InitHook(const HookParam&, LPWSTR name=0, WORD set_flag=0);
 	int InitHook(LPVOID addr, DWORD data, DWORD data_ind, 
 		DWORD split_off, DWORD split_ind, WORD type, DWORD len_off=0);
-	void Send(DWORD dwDataBase, DWORD dwRetn);
+	DWORD Send(DWORD dwDataBase, DWORD dwRetn);
 	int RecoverHook();
 	int RemoveHook();
 	int ClearHook();

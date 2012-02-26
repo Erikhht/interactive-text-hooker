@@ -733,6 +733,7 @@ void ClickButton(HWND hWnd, HWND h)
 			{
 				SaveProcessProfile(pid);
 				if (pfwnd) pfwnd->InitProfiles();
+				pfman->SaveProfile();
 			}
 		}
 	}
