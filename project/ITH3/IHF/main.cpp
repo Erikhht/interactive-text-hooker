@@ -59,7 +59,9 @@ void GetDebugPriv(void)
 	}
 	else 
 	{
-		MessageBox(0, NotAdmin, L"Warning!", 0);
+		WCHAR buffer[0x10];
+		swprintf(buffer, L"%.8X",status);
+		MessageBox(0, NotAdmin, buffer, 0);
 	}
 
 	NtClose(hToken);

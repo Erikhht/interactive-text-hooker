@@ -25,7 +25,7 @@ const wchar_t* SelfAttach=L"Please do not attach to ITH.exe";
 const wchar_t* AlreadyAttach=L"Process already attached.";
 const wchar_t* FormatInject=L"Inject process %d. Module base %.8X";
 //main.cpp
-const wchar_t* NotAdmin=L"Can't enable SeDebugPrevilege. ITH might malfunction.\r\n\
+const wchar_t* NotAdmin=L"Can't enable SeDebugPrivilege. ITH might malfunction.\r\n\
 Please run ITH as administrator or turn off UAC.";
 //pipe.cpp
 const wchar_t* ErrorCreatePipe=L"Can't create text pipe or too many instance.";
@@ -38,7 +38,8 @@ const wchar_t* ErrorMonitor=L"Can't monitor process.";
 //utility.cpp
 const wchar_t* InitMessage=L"Copyright (C) 2010-2012  kaosu (qiupf2000@gmail.com)\r\n\
 Source code <http://code.google.com/p/interactive-text-hooker/>\r\n\
-General discussion <http://www.hongfire.com/forum/showthread.php?t=208860>\r\n";
+General discussion <http://www.hongfire.com/forum/showthread.php?t=208860>\r\n\
+Google group <http://groups.google.com/group/interactive-text-hooker>\r\n";
 const wchar_t* BackgroundMsg=L"If you feel tired about the pure white background,\r\n\
 put your favorite picture in ITH folder and name it 'background.bmp'\r\n";
 const wchar_t* ErrorLinkExist=L"Link exist.";
