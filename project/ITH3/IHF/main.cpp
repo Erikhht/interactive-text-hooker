@@ -73,6 +73,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 		InitializeCriticalSection(&cs);
 		IthInitSystemService();
 		GetDebugPriv();
+		//Used by timers.
 		hMainWnd = CreateWindow(L"Button", L"InternalWindow", 0, 0, 0, 0, 0, 0, 0, hinstDLL, 0);
 		break;
 	case DLL_PROCESS_DETACH:
@@ -116,11 +117,10 @@ DWORD Inject(HANDLE hProc, LPWSTR engine)
 
 	NtAllocateVirtualMemory(hProc, &lpvAllocAddr, 0, &dwWrite, MEM_COMMIT, PAGE_READWRITE);
 	if (lpvAllocAddr == 0) return -1;
-	//Not thread safe, but works most of the time.
-	//wcscpy(current_dir, DllName);
+
 	CheckThreadStart();
 
-	//Copy module path into address space of target process, skip NT path header '\\??\\'.
+	//Copy module path into address space of target process.
 	NtWriteVirtualMemory(hProc, lpvAllocAddr, path, MAX_PATH << 1, &dwWrite);
 
 	hTH = IthCreateThread(LoadLibrary, (DWORD)lpvAllocAddr, hProc);

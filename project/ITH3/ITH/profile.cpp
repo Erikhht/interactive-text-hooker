@@ -765,14 +765,16 @@ bool ProfileManager::AddProfile(TiXmlElement* game)
 }
 DWORD ProfileManager::AddProfile(LPWSTR path, Profile* p)
 {
+	DWORD result = -1;
 	LockProfileManager();
 	TreeNode<LPWSTR,DWORD>* node = profile_tree.Insert(path, profile_table.next);
 	if (node->data == profile_table.next)
 	{
 		profile_table.Append(p);
+		result = node->data;
 	}
 	UnlockProfileManager();
-	return node->data;
+	return result;
 }
 void ProfileManager::RefreshProfileXml(LPWSTR path)
 {	
@@ -1255,7 +1257,7 @@ DWORD SaveProcessProfile(DWORD pid)
 		pf = new Profile;		
 		pfman->AddProfile(path, pf);
 	}
-	pf->title = SaveProcessTitle(pid);
+	pf->title = SaveProcessTitle(pid); //New allocated from heap.
 
 	NtWaitForSingleObject(pr->hookman_mutex, 0, 0);
 	Hook* hook = (Hook*)pr->hookman_map;
@@ -1272,7 +1274,7 @@ DWORD SaveProcessProfile(DWORD pid)
 				NtReadVirtualMemory(pr->process_handle, hook[i].Name(), name, hook[i].NameLength()<<1, &j);
 				name[hook[i].NameLength()] = 0;
 				pf->AddHook(hook[i].hp, name);
-			}			
+			}
 		}
 	}
 	NtReleaseMutant(pr->hookman_mutex, 0);

@@ -204,30 +204,36 @@ DWORD GetCode(const HookParam& hp, LPWSTR buffer, DWORD pid)
 		if (hp.split_ind>>31) ptr+=swprintf(ptr,L"*-%X",-hp.split_ind);
 		else ptr+=swprintf(ptr,L"*%X",hp.split_ind);
 	}
-	if (hp.module)
-	{
-		if (pid)
+	if (pid)
+	{		
+		ProcessRecord *pr = man->GetProcessRecord(pid);
+		if (pr)
 		{
-			WCHAR path[MAX_PATH];
 			MEMORY_BASIC_INFORMATION info;
-			ProcessRecord *pr = man->GetProcessRecord(pid);
-			if (pr)
+			HANDLE hProc=pr->process_handle;
+			if (NT_SUCCESS(NtQueryVirtualMemory(hProc,(PVOID)hp.addr,
+				MemoryBasicInformation,&info,sizeof(info),0)))
 			{
-				HANDLE hProc=pr->process_handle;
-				if (NT_SUCCESS(NtQueryVirtualMemory(hProc,(PVOID)hp.addr,MemorySectionName,path,MAX_PATH*2,0)))
-					if (NT_SUCCESS(NtQueryVirtualMemory(hProc,(PVOID)hp.addr,MemoryBasicInformation,&info,sizeof(info),0)))
+				if (info.Type & MEM_IMAGE)
+				{
+					
+					WCHAR path[MAX_PATH];
+					if (NT_SUCCESS(NtQueryVirtualMemory(hProc,(PVOID)hp.addr,
+						MemorySectionName,path,MAX_PATH*2,0)))
+					{
 						ptr+=swprintf(ptr,L"@%X:%s",hp.addr-(DWORD)info.AllocationBase,wcsrchr(path,L'\\')+1);
-
+						return ptr - buffer;
+					}
+				}
 			}
 		}
-		else
-		{
-			ptr+=swprintf(ptr,L"@%X!%X",hp.addr,hp.module);
-			if (hp.function) ptr+=swprintf(ptr,L"!%X",hp.function);
-		}
 	}
-	else
-		ptr+=swprintf(ptr,L"@%X",hp.addr);
+	if (hp.module)
+	{
+		ptr+=swprintf(ptr,L"@%X!%X",hp.addr,hp.module);
+		if (hp.function) ptr+=swprintf(ptr,L"!%X",hp.function);
+	}
+	else ptr+=swprintf(ptr,L"@%X",hp.addr);
 	return ptr - buffer;
 }
 int UTF8to16len(const char* mb)

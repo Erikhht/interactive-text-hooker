@@ -2952,7 +2952,7 @@ DWORD DetermineNoHookEngine()
 }
 DWORD DetermineEngineType()
 {
-	OutputConsole(L"Engine support module 2012.2.20");
+	OutputConsole(L"Engine support module 2012.2.27");
 	if (DetermineEngineByFile1()==0) return 0;
 	if (DetermineEngineByFile2()==0) return 0;
 	if (DetermineEngineByFile3()==0) return 0;

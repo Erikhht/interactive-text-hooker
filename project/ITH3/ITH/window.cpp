@@ -1752,14 +1752,21 @@ void ProcessWindow::AddCurrentToProfile()
 			SetWindowText(heOutput, L"Profile already exists.");
 		else
 		{
-			Profile *pf = new Profile;
-			pfman->AddProfile(path, pf);
+			Profile *pf = new Profile;		
 			pf->title = SaveProcessTitle(item.lParam);
-			pfman->RefreshProfileXml(path);
-			pfman->RefreshProfileAddr(item.lParam, path);
+			if (-1 != pfman->AddProfile(path, pf))
+			{
+				pfman->RefreshProfileXml(path);
+				pfman->RefreshProfileAddr(item.lParam, path);				
+				SetWindowText(heOutput, L"Profile added");
+				if (pfwnd) pfwnd->InitProfiles();
+			}
+			else
+			{
+				SetWindowText(heOutput, L"Already exist");
+				delete pf;
+			}
 			EnableWindow(hbAddProfile, 0);
-			SetWindowText(heOutput, L"Profile added");
-			if (pfwnd) pfwnd->InitProfiles();
 		}
 	}
 	else SetWindowText(heOutput, L"Fail to add profile");
