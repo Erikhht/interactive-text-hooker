@@ -2477,33 +2477,60 @@ DWORD FindNextCall(DWORD start, DWORD range, DWORD base, DWORD limit, DWORD* fun
 	}
 	return 0;
 }
+void SpecialHookRyokucha(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+{
+	DWORD *base = (DWORD*)esp_base;
+	DWORD i, j;
+	for (i = 1; i < 5; i++)
+	{
+		j = base[i];
+		if ((j >> 16) == 0 && (j >> 8))
+		{
+			hp.off = i << 2;
+			*data = j;
+			*len = 2;
+			hp.type &= ~EXTERN_HOOK;
+			return;
+		}
+	}
+	*len = 0;
+}
 bool InsertRyokuchaDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 {
-	if (addr != IsDBCSLeadByte) return false;
-	DWORD retn = *(DWORD*)(stack + 4);
-	DWORD next, fun, base,limit;
-	if (FillRange(process_name, &base, &limit))
+	if (addr != GetGlyphOutlineA) return false;
+	DWORD handler_addr;
+	union
 	{
-		next = FindNextCall(retn, 0x40, base, limit, &fun);
-		if (next)
+		DWORD i;
+		DWORD* id;
+		WORD* iw;
+		BYTE* ib;
+	};
+	__asm
+	{
+		mov eax,fs:[0]
+		mov eax,[eax]
+		mov eax,[eax]
+		mov eax,[eax + 4]
+		mov handler_addr,eax
+	}
+	for (i = module_base + 0x1000; i < module_limit - 4; i++)
+	{
+		if (*id == handler_addr)
 		{
-			next = FindNextCall(fun, 0x40, base, limit, &fun);
-			if (next)
-			{
-				next = FindNextCall(fun, 0x40, base, limit, &fun);
-				if (next)
+			if (*(ib - 1) == 0x68)
+			{				
+				HookParam hp = {};
+				hp.addr = FindEntryAligned(i, 0x20);
+				if (hp.addr)
 				{
-					next = FindNextCall(next, 0x40, base, limit, &fun);
-					if (next)
-					{
-						HookParam hp;
-						hp.addr = fun;
-						hp.off = 8;
-						hp.type = BIG_ENDIAN;
-						hp.length_offset = 1;
-						NewHook(hp, L"StudioRyokucha");
-						return true;
-					}
+					
+					hp.off = 8;
+					hp.length_offset = 1;
+					hp.extern_fun = (DWORD)SpecialHookRyokucha;
+					hp.type = BIG_ENDIAN | EXTERN_HOOK;
+					NewHook(hp, L"StudioRyokucha");
+					return true;
 				}
 			}
 		}
@@ -2515,8 +2542,6 @@ void InsertRyokuchaHook()
 {
 	OutputConsole(L"Probably Ryokucha. Wait for text.");
 	trigger_fun = InsertRyokuchaDynamicHook;
-	HookParam hp = {(DWORD)IsDBCSLeadByte};
-	NewHook(hp, 0, HOOK_AUXILIARY);
 	SwitchTrigger(true);
 }
 DWORD InsertDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
@@ -2807,7 +2832,7 @@ DWORD DetermineEngineByProcessName()
 		InsertShinaHook();
 		return 0;
 	}
-	static WCHAR saveman[] = L"_saveman.exe";
+	static WCHAR saveman[] = L"_checksum.exe";
 	wcscpy(str+len-4,saveman);
 	if (IthCheckFile(str))
 	{
