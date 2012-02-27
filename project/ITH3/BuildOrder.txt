@@ -1,4 +1,0 @@
-1. ITH_SYS, IHF_EnableSEH
-2. ITH_TinyXmlLib, ITH_TLS
-3. IHF, IHF_DLL
-4. ITH, ITH_Engine, ITH_Updater
