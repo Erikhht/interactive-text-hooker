@@ -2498,44 +2498,31 @@ void SpecialHookRyokucha(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* spli
 bool InsertRyokuchaDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 {
 	if (addr != GetGlyphOutlineA) return false;
-	DWORD handler_addr;
-	union
-	{
-		DWORD i;
-		DWORD* id;
-		WORD* iw;
-		BYTE* ib;
-	};
+	bool flag;
+	DWORD insert_addr;
 	__asm
 	{
 		mov eax,fs:[0]
 		mov eax,[eax]
 		mov eax,[eax]
+		mov ecx,[eax + 0xC]
 		mov eax,[eax + 4]
-		mov handler_addr,eax
-	}
-	for (i = module_base + 0x1000; i < module_limit - 4; i++)
+		add ecx,[ecx - 4]
+		mov insert_addr,ecx
+		cmp eax,[ecx + 3]
+		sete al
+		mov flag,al
+	}					
+	if (flag)
 	{
-		if (*id == handler_addr)
-		{
-			if (*(ib - 1) == 0x68)
-			{				
-				HookParam hp = {};
-				hp.addr = FindEntryAligned(i, 0x20);
-				if (hp.addr)
-				{
-					
-					hp.off = 8;
-					hp.length_offset = 1;
-					hp.extern_fun = (DWORD)SpecialHookRyokucha;
-					hp.type = BIG_ENDIAN | EXTERN_HOOK;
-					NewHook(hp, L"StudioRyokucha");
-					return true;
-				}
-			}
-		}
+		HookParam hp = {};
+		hp.addr = insert_addr;
+		hp.length_offset = 1;
+		hp.extern_fun = (DWORD)SpecialHookRyokucha;	
+		hp.type = BIG_ENDIAN | EXTERN_HOOK;	
+		NewHook(hp, L"StudioRyokucha");
 	}
-	OutputConsole(L"Unknown Ryokucha engine.");
+	else OutputConsole(L"Unknown Ryokucha engine.");
 	return true;
 }
 void InsertRyokuchaHook()
