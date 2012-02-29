@@ -458,6 +458,8 @@ BOOL CALLBACK ProfileDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	case WM_INITDIALOG:
 		pfwnd = new ProfileWindow(hDlg);
 		hProfileDlg = hDlg;
+		EnableWindow(GetDlgItem(hDlg, IDC_BUTTON2), FALSE);
+		EnableWindow(GetDlgItem(hDlg, IDC_BUTTON4), FALSE);
 		return TRUE;
 
 	case WM_COMMAND:
@@ -495,6 +497,7 @@ BOOL CALLBACK ProfileDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					int index = SendMessage((HWND)lParam,LB_GETCURSEL, 0, 0);
 					if (index != LB_ERR)
 					{
+						
 						if (pfwnd->RefreshGames(index))
 							pfwnd->RefreshGamesList();
 					}
@@ -505,7 +508,12 @@ BOOL CALLBACK ProfileDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				{
 					int index = SendMessage((HWND)lParam,LB_GETCURSEL, 0, 0);
 					if (index != LB_ERR)
+					{
+						if (pfwnd->GetCurrentSelect() != -1)
+							EnableWindow(GetDlgItem(hDlg, IDC_BUTTON4), TRUE);
+						pfwnd->GetCurrentSelect();
 						pfwnd->RefreshProfile(index);
+					}
 				}
 				break;
 			default:
@@ -525,6 +533,7 @@ BOOL CALLBACK ProfileDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					{
 						if (pnmv->iItem != -1 && pnmv->uNewState == 3)
 						{
+							EnableWindow(GetDlgItem(hDlg, IDC_BUTTON2), TRUE);
 							Profile* pf = pfman->GetProfileByIndex(pnmv->iItem);
 							if (pf) pfwnd->RefreshProfile(pf);
 						}	
@@ -2577,6 +2586,10 @@ void ProfileWindow::ClearStatusText()
 void ProfileWindow::SetStatusSuccess()
 {
 	SendMessage(heStatus, WM_SETTEXT, 0, (LPARAM)L"Success");
+}
+DWORD ProfileWindow::GetCurrentSelect()
+{
+	return ListView_GetSelectionMark(hlProfileList);
 }
 #define STR_DEFAULT_SIZE 0x100
 void AddString(MyVector<WCHAR, STR_DEFAULT_SIZE>& str, LPWSTR s)
