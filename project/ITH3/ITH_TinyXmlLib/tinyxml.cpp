@@ -36,7 +36,10 @@ added in-memory parsing and UTF-16 helpers, line break is changed to CRLF.
 
 #include <ITH\tinyxml.h>
 
-
+int _purecall()
+{
+	return 0;
+}
 bool TiXmlBase::condenseWhiteSpace = true;
 
 #ifdef STD_FILESTREAM

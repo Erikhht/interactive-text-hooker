@@ -308,14 +308,43 @@ HINSTANCE GetModuleBase()
 		mov eax,[eax+0x8]
 	}
 }
-
+LONG WINAPI unhandled_except(_EXCEPTION_POINTERS *ExceptionInfo)
+{
+	WCHAR code[0x10],name[0x200];
+	EXCEPTION_RECORD* rec = ExceptionInfo->ExceptionRecord;
+	swprintf(code, L"%.8X",rec->ExceptionCode);
+	MEMORY_BASIC_INFORMATION info;
+	DWORD retn, addr;
+	if (NT_SUCCESS(NtQueryVirtualMemory(NtCurrentProcess(), rec->ExceptionAddress,
+		MemoryBasicInformation,&info, sizeof(info), &retn)))
+	{
+		if (NT_SUCCESS(NtQueryVirtualMemory(NtCurrentProcess(), rec->ExceptionAddress, 
+			MemorySectionName, name, 0x400, &retn)))
+		{
+			LPWSTR ptr = wcsrchr(name, L'\\');
+			if (ptr)
+			{
+				addr = (DWORD)rec->ExceptionAddress;
+				swprintf(ptr - 8, L"%.8X", addr - (DWORD)info.AllocationBase);
+				*ptr = L':';
+				MessageBox(0, ptr - 8, code, 0);
+				NtTerminateProcess(NtCurrentProcess(), 0);
+			}
+		}
+	}
+	swprintf(name, L"%.8X",ExceptionInfo->ExceptionRecord->ExceptionAddress);
+	MessageBox(0,name,code,0);
+	NtTerminateProcess(NtCurrentProcess(), 0);
+	return 0;
+}
 int main()
 {
 	IthInitSystemService();	
 	IthCreateMutex(L"ITH_MAIN_RUNNING",TRUE);
 	if (IHF_Init())
 	{
-		ITH_TLS_Init();
+		//ITH_TLS_Init();
+		SetUnhandledExceptionFilter(unhandled_except);
 		IHF_GetHookManager(&man);
 		IHF_GetSettingManager(&setman);
 		pfman = new ProfileManager;
@@ -340,7 +369,7 @@ int main()
 		delete uni_filter;
 		delete pfman;
 		man = 0;
-		ITH_TLS_Cleanup();
+		//ITH_TLS_Cleanup();
 	}
 	else
 	{

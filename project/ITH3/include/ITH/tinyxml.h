@@ -83,6 +83,8 @@ distribution.
 	#define TIXML_SSCANF   sscanf
 #endif	
 
+extern "C" int _purecall();
+
 class TiXmlDocument;
 class TiXmlElement;
 class TiXmlComment;

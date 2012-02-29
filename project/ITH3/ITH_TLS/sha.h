@@ -90,11 +90,11 @@ class HashCalculator
 public:
 	HashCalculator() {}
 	virtual ~HashCalculator() {}
-	virtual void HashInit() = 0;
-	virtual void HashUpdate(void* msg, int len) = 0;
-	virtual void HashFinal(void* hash) = 0;
-	virtual int HashValueSize() const = 0;
-	virtual int HashBlockSize() const = 0;
+	virtual void HashInit() {}
+	virtual void HashUpdate(void* msg, int len) {}
+	virtual void HashFinal(void* hash) {}
+	virtual int HashValueSize() const {return 0;}
+	virtual int HashBlockSize() const {return 0;}
 };
 
 enum HashType

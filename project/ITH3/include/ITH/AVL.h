@@ -325,6 +325,7 @@ public:
 	TreeNode<T*,D>* SearchIndex(unsigned int rank)
 	{
 		unsigned int r = head.rank;
+		if (rank == -1) return 0;
 		if (++rank>=r) return 0;
 		TreeNode<T*,D>* n=&head;
 		while (r!=rank)
