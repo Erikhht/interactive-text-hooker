@@ -359,7 +359,7 @@ unsigned char ASN1ObjectIdentifier::RDNType()
 unsigned int RSAKeyItem::PublicKey(unsigned char* k)
 {
 	unsigned int l = public_mod.ASN1Len();
-	memcpy(k, public_mod.Value(), l);
+	if (k) memcpy(k, public_mod.Value(), l);
 	return l;
 }
 unsigned int RSAKeyInfo::PublicKey(unsigned char* k)
