@@ -472,6 +472,25 @@ void TextThread::AddToStore(BYTE* con,int len, bool new_line,bool console)
 		}
 		sentence_length+=len;
 	}
+	if (sentence_length == 0)
+	{
+		if (status & USING_UNICODE)
+		{
+			if (*(WORD*)con == 0x3000)
+			{
+				con += 2;
+				len -= 2;
+			}
+		}
+		else
+		{
+			if (*(WORD*)con == 0x4180)
+			{
+				con += 2;
+				len -= 2;
+			}
+		}
+	}
 	if (callback) len = callback(this,con,len, new_line,app_data);
 	if (MyVector::AddToStore(con,len))
 	{
