@@ -219,7 +219,7 @@ char original_cmp(const ThreadParameter* t1, const ThreadParameter* t2)
 	//return t>0?1:-1;
 }
 char TCmp::operator()(const ThreadParameter* t1, const ThreadParameter* t2)
-	//SSE speed up. Compare 4 integer in const time without branching.
+	//SSE speed up. Compare four integers in const time without branching.
 	//The AVL tree branching operation needs 2 bit of information.
 	//One bit for equality and one bit for "less than" or "greater than".
 

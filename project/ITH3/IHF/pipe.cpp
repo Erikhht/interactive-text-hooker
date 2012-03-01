@@ -41,7 +41,7 @@ BYTE* Filter(BYTE *str, int len)
 		s = *(WORD*)str;
 		if (len >= 2)
 		{
-			if (s == 0x4081 || s == 0x3000 || s <= 0x20) {str += 2; len -= 2;}
+			if (s <= 0x20) {str += 2; len -= 2;}
 			else break;
 		}
 		else if (str[0] <= 0x20) 
