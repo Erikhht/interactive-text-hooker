@@ -448,12 +448,12 @@ bool Profile::XmlWriteProfileThread(TiXmlElement* threads_node)
 		if (name == 0) return false;	
 		TiXmlElement* node = NewElement("Thread");
 		node->SetAttributeWithUTF16("HookName",name);
-		sprintf(str,"%x",threads[i].retn);
-		node->SetAttribute("Context",str);
-		sprintf(str,"%x",threads[i].split);
-		node->SetAttribute("SubContext",str);
 		sprintf(str,"%x",threads[i].flags & 3);
 		node->SetAttribute("Mask",str);
+		sprintf(str,"%x",threads[i].split);
+		node->SetAttribute("SubContext",str);
+		sprintf(str,"%x",threads[i].retn);
+		node->SetAttribute("Context",str);
 		if (threads[i].comment)
 		{
 			node->SetAttributeWithUTF16("Comment",threads[i].comment);

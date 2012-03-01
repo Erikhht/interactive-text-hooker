@@ -1343,6 +1343,7 @@ void InsertRetouchHook()
 		NewHook(hp,L"RetouchSystem");
 		//RegisterEngineType(ENGINE_RETOUCH);
 	}
+	OutputConsole(L"Unknown RetouchSystem engine.");
 }
 /********************************************************************************************
 Malie hook:
@@ -1599,52 +1600,67 @@ void InsertBrunsHook()
 	HookParam hp={};
 	hp.off=4;
 	hp.length_offset=1;
-	hp.type=USING_UNICODE|MODULE_OFFSET|FUNCTION_OFFSET;
-	hp.function=0x8B24C7BC;
-	//?push_back@?$basic_string@GU?$char_traits@G@std@@V?$allocator@G@2@@std@@QAEXG@Z
-	if (IthCheckFile(L"msvcp90.dll"))
+	hp.type=USING_UNICODE;
+	if (IthCheckFile(L"libscr.dll"))
 	{
-		hp.module=0xC9C36A5B; //msvcp90.dll
-		NewHook(hp,L"Bruns");
-		//RegisterEngineType(ENGINE_BRUNS);
-		return;
-	}
-	if (IthCheckFile(L"msvcp80.dll"))
-	{
-		hp.module=0xA9C36A5B; //msvcp80.dll
-		NewHook(hp,L"Bruns");
-		//RegisterEngineType(ENGINE_BRUNS);
-		return;
-	}
-}
-void SpecialHookFrontwing(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
-{
-	char* msg=*(char**)(esp_base-0xC);
-	char* text=*(char**)(esp_base-0x14);
-	if (text)
-	{
-		BYTE c=text[0];
-		if (c!='^'&&msg)
+		hp.type|=MODULE_OFFSET|FUNCTION_OFFSET;
+		hp.function=0x8B24C7BC;
+		//?push_back@?$basic_string@GU?$char_traits@G@std@@V?$allocator@G@2@@std@@QAEXG@Z
+		if (IthCheckFile(L"msvcp90.dll"))
 		{
-			msg+=8;
-			if (strcmp(msg,"MessageAction,self")==0)
-			//if (strcmp(msg,"\\sub,@@!MessageAddLog,self")==0)
+			hp.module=0xC9C36A5B; //msvcp90.dll
+			NewHook(hp,L"Bruns");
+			//RegisterEngineType(ENGINE_BRUNS);
+			return;
+		}
+		if (IthCheckFile(L"msvcp80.dll"))
+		{
+			hp.module=0xA9C36A5B; //msvcp80.dll
+			NewHook(hp,L"Bruns");
+			//RegisterEngineType(ENGINE_BRUNS);
+			return;
+		}
+	}
+	else
+	{
+		DWORD j,k,t;
+		union
+		{
+			DWORD i;
+			DWORD* id;
+			WORD* iw;
+			BYTE* ib;
+		};
+		k = module_limit - 4;
+		for (i = module_base + 0x1000; i < k; i++)
+		{
+			if (*id == 0xFF) //cmp reg,0xFF
 			{
-				while (1)
+				i += 4;
+				if (*iw == 0x8F0F) //jg
 				{
-					c=text[0];
-					if (c==0) break;
-					if (LeadByteTable[c]==2) break;
-					text++;
+					i += 2;
+					i += *id + 4;
+					for (j = i + 0x40; i < j; i++)
+					{
+						if (*ib == 0xE8)
+						{
+							i++;
+							t = i + 4 + *id;
+							if (t > module_base && t <module_limit)
+							{
+								hp.addr = t;
+								NewHook(hp, L"Bruns");
+								return;
+							}
+						}
+					}
+					
 				}
-				*len=strlen(text);
-				*data=(DWORD)text;
-				*split=*(DWORD*)(esp_base-0x18);
-				return;
 			}
 		}
 	}
-	*len=0;
+	OutputConsole(L"Unknown Bruns engine.");
 }
 void InsertFrontwingHook()
 {
@@ -1682,15 +1698,6 @@ void InsertFrontwingHook()
 			}
 		}
 	}
-	/*if (i)
-	{
-		HookParam hp={};
-		hp.addr=module_base+i-3;
-		hp.extern_fun=(DWORD)SpecialHookFrontwing;
-		hp.type=EXTERN_HOOK|USING_STRING;
-		NewHook(hp,L"QLIE");
-		RegisterEngineType(ENGINE_FRONTWING);
-	}*/
 	OutputConsole(L"Unknown QLIE engine");
 }
 /********************************************************************************************
@@ -2504,7 +2511,7 @@ bool InsertRyokuchaDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 	{
 		mov eax,fs:[0]
 		mov eax,[eax]
-		mov eax,[eax]
+		mov eax,[eax] //Step up upon SEH chain for 2 nodes.
 		mov ecx,[eax + 0xC]
 		mov eax,[eax + 4]
 		add ecx,[ecx - 4]
@@ -2700,11 +2707,11 @@ DWORD DetermineEngineByFile2()
 }
 DWORD DetermineEngineByFile3()
 {
-	if (IthCheckFile(L"libscr.dll"))
+	/*if (IthCheckFile(L"libscr.dll"))
 	{
 		InsertBrunsHook();
 		return 0;
-	}
+	}*/
 	if (IthFindFile(L"emecfg.ecf"))
 	{
 		InsertEMEHook();
@@ -2801,6 +2808,11 @@ DWORD DetermineEngineByProcessName()
 	if (wcsstr(str,L"igs_sample"))
 	{
 		InsertIronGameSystemHook();
+		return 0;
+	}
+	if (wcsstr(str,L"bruns"))
+	{
+		InsertBrunsHook();
 		return 0;
 	}
 	DWORD len = wcslen(str);
