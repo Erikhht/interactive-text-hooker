@@ -2500,6 +2500,7 @@ void ProfileWindow::FindProperProfile() //Simply sequential search. Plan to impr
 					{
 						RefreshProfile(result);
 						SetStatusSuccess();
+						EnableWindow(GetDlgItem(hDlg,IDC_BUTTON4), TRUE);
 					}
 				}
 				return;
