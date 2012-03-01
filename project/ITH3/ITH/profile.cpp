@@ -1273,7 +1273,19 @@ DWORD SaveProcessProfile(DWORD pid)
 			{
 				NtReadVirtualMemory(pr->process_handle, hook[i].Name(), name, hook[i].NameLength()<<1, &j);
 				name[hook[i].NameLength()] = 0;
-				pf->AddHook(hook[i].hp, name);
+				if (hook[i].hp.module)
+				{
+					HookParam hp = hook[i].hp;
+					hp.function = 0;
+					MEMORY_BASIC_INFORMATION info;
+					DWORD retn;
+					NtQueryVirtualMemory(pr->process_handle, (PVOID)hp.addr, 
+						MemoryBasicInformation, &info, sizeof(info), &retn);
+					hp.addr -= (DWORD)info.AllocationBase;
+					pf->AddHook(hp, name);
+				}
+				else
+					pf->AddHook(hook[i].hp, name);
 			}
 		}
 	}
