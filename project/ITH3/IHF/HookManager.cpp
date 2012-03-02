@@ -263,8 +263,7 @@ HookManager::HookManager()
 	//texts->SetUnicode(true);
 	//entry->AddToCombo();
 	//entry->ComboSelectCurrent();
-	entry->AddToStore((BYTE*)version,wcslen(version)<<1,0,1);
-	entry->AddToStore((BYTE*)InitMessage,wcslen(InitMessage)<<1,0,1);
+
 	//if (background==0) entry->AddToStore((BYTE*)BackgroundMsg,wcslen(BackgroundMsg)<<1,0,1);
 
 	InitializeCriticalSection(&hmcs);

@@ -73,9 +73,9 @@ public:
 	virtual void SelectCurrent(DWORD num);
 	virtual void DetachProcess(DWORD pid);
 	virtual void SetCurrent(TextThread* it);
+	virtual void AddConsoleOutput(LPCWSTR text);
 
-	void DispatchText(DWORD pid, BYTE* text, DWORD hook, DWORD retn, DWORD split, int len);
-	void AddConsoleOutput(LPCWSTR text);
+	void DispatchText(DWORD pid, BYTE* text, DWORD hook, DWORD retn, DWORD split, int len);	
 	void ClearText(DWORD pid, DWORD hook, DWORD retn, DWORD split);
 	void RemoveProcessContext(DWORD pid);
 	void RemoveSingleHook(DWORD pid, DWORD addr);

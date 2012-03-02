@@ -24,6 +24,7 @@
 #include <ITH\IHF_SYS.h>
 #include <ITH\ITH_TLS.h>
 #include <ITH\HookManager.h>
+#include <ITH\version.h>
 #define CMD_SIZE 0x200
 
 LPWSTR import_buffer;
@@ -480,7 +481,7 @@ BOOL CALLBACK ProfileDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				pfwnd->FindProperProfile();
 				break;
 			case IDC_BUTTON3:
-				pfwnd->RefreshManifest();
+				pfwnd->DeleteProfile();
 				break;
 			case IDC_BUTTON4:
 				pfwnd->ImportProfile();
@@ -534,6 +535,7 @@ BOOL CALLBACK ProfileDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 						if (pnmv->iItem != -1 && pnmv->uNewState == 3)
 						{
 							EnableWindow(GetDlgItem(hDlg, IDC_BUTTON2), TRUE);
+							EnableWindow(GetDlgItem(hDlg, IDC_BUTTON3), TRUE);
 							Profile* pf = pfman->GetProfileByIndex(pnmv->iItem);
 							if (pf) pfwnd->RefreshProfile(pf);
 						}	
@@ -1142,9 +1144,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				man->RegisterThreadCreateCallback(ThreadCreate);
 				man->RegisterThreadRemoveCallback(ThreadRemove);
 				man->RegisterThreadResetCallback(ThreadReset);
-				TextThread* console = man->FindSingle(0);
+				man->AddConsoleOutput(version);
+				man->AddConsoleOutput(InitMessage);
+				TextThread* console = man->FindSingle(0);			
 				console->RegisterCallBack(ThreadOutput,0);
 				AddToCombo(console);
+
 				DWORD len = 0;
 				BYTE* str = console->GetStore(&len);
 				SendMessage(hwndEdit, WM_SETTEXT, 0, (LPARAM)str);
@@ -2285,6 +2290,7 @@ void ProfileWindow::InitProfiles()
 			ListView_SetItemText(hlProfileList, i, 1, pf->title);
 	}
 	pfman->UnlockProfileManager();
+	EnableWindow(GetDlgItem(hDlg,IDC_BUTTON3),FALSE);
 }
 void ProfileWindow::RefreshManifest()
 {
@@ -2714,6 +2720,14 @@ void ProfileWindow::ExportAllProfile()
 {
 	pfman->ExportAllProfile(L"ITH_Profile_Export.xml");
 }
+void ProfileWindow::DeleteProfile()
+{
+	DWORD index = ListView_GetSelectionMark(hlProfileList);
+	if (index == -1) return;
+	pfman->DeleteProfile(index);
+	InitProfiles();
+}
+
 
 class IthGlyph
 {

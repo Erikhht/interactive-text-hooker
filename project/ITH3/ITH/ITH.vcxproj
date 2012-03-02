@@ -92,8 +92,7 @@
       <DataExecutionPrevention>false</DataExecutionPrevention>
     </Link>
     <PreBuildEvent>
-      <Command>
-      </Command>
+      <Command>$(SolutionDir)BuildDate $(SolutionDir)</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>

@@ -1,1 +1,1 @@
-const wchar_t* version=L"Interactive Text Hooker 3.0 (2012.03.01)\r\n"; 
+const wchar_t* version=L"Interactive Text Hooker 3.0 (2012.03.02)"; 

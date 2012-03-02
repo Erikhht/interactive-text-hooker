@@ -970,9 +970,22 @@ void ProfileManager::DeleteProfile(int index)
 	TreeNode<LPWSTR, DWORD>* node = profile_tree.SearchIndex(index);
 	if (node)
 	{
+		DWORD data = node->data;
 		profile_tree.Delete(node->key);
-		delete profile_table.Get(node->data);
-		profile_table.Set(node->data,0);
+		delete profile_table.Get(data);
+		profile_table.Set(data,0);
+		TiXmlElement *root = doc.RootElement();
+		if (root)
+		{
+			TiXmlElement *game;
+			game = xml_table[data];
+			if (game)
+			{
+				xml_table.Set(data,0);
+				root->RemoveChild(game);
+				SaveProfile();
+			}
+		}
 	}
 	/*ProfileNode* pf = GetProfile(index);
 	if (pf == 0) return;

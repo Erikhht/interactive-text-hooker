@@ -95,7 +95,8 @@
       <Command>$(SolutionDir)DLL_PostBuild $(SolutionDir) $(ProjectName)</Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>$(SolutionDir)BuildDate $(SolutionDir)</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
     <CustomBuildStep>
       <Command>

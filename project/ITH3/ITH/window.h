@@ -145,6 +145,7 @@ public:
 	void SetStatusSuccess();
 	void ExportProfile();
 	void ExportAllProfile();
+	void DeleteProfile();
 	Profile* GetCurrentProfile();
 	DWORD GetCurrentSelect();
 	HWND hDlg;
