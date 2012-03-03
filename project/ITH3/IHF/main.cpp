@@ -112,7 +112,7 @@ DWORD Inject(HANDLE hProc, LPWSTR engine)
 	p = GetMainModulePath();
 	len = wcslen(p);
 	memcpy(path, p, len << 1);
-	memset(p + len, 0, (MAX_PATH - len) << 1);
+	memset(path + len, 0, (MAX_PATH - len) << 1);
 	for (p = path + len; *p != L'\\'; p--); //Always a \ after drive letter.
 	p++;
 	wcscpy(p, DllName);

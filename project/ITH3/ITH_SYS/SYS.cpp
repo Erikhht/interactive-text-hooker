@@ -573,10 +573,10 @@ void IthInitSystemService()
 
 	DWORD base = (DWORD)peb->ReadOnlySharedMemoryBase;
 	DWORD end = base + info.RegionSize - 0x40;
-	static WCHAR windows[] = L"system32";
+	static WCHAR system32[] = L"system32";
 	for (;base < end; base += 2)
 	{
-		if (memcmp((PVOID)base, windows, 0x10) == 0)
+		if (memcmp((PVOID)base, system32, 0x10) == 0)
 		{
 			t = (LPWSTR)base;
 			while (*t-- != L':');
