@@ -459,8 +459,8 @@ BOOL CALLBACK ProfileDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	case WM_INITDIALOG:
 		pfwnd = new ProfileWindow(hDlg);
 		hProfileDlg = hDlg;
-		EnableWindow(GetDlgItem(hDlg, IDC_BUTTON2), FALSE);
-		EnableWindow(GetDlgItem(hDlg, IDC_BUTTON4), FALSE);
+			
+
 		return TRUE;
 
 	case WM_COMMAND:
@@ -511,7 +511,10 @@ BOOL CALLBACK ProfileDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					if (index != LB_ERR)
 					{
 						if (pfwnd->GetCurrentSelect() != -1)
+						{
 							EnableWindow(GetDlgItem(hDlg, IDC_BUTTON4), TRUE);
+
+						}
 						pfwnd->GetCurrentSelect();
 						pfwnd->RefreshProfile(index);
 					}
@@ -536,6 +539,8 @@ BOOL CALLBACK ProfileDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 						{
 							EnableWindow(GetDlgItem(hDlg, IDC_BUTTON2), TRUE);
 							EnableWindow(GetDlgItem(hDlg, IDC_BUTTON3), TRUE);
+							EnableWindow(GetDlgItem(hDlg, IDC_BUTTON5), TRUE);
+							EnableWindow(GetDlgItem(hDlg, IDC_BUTTON6), TRUE);
 							Profile* pf = pfman->GetProfileByIndex(pnmv->iItem);
 							if (pf) pfwnd->RefreshProfile(pf);
 						}	
@@ -2288,7 +2293,11 @@ void ProfileWindow::InitProfiles()
 			ListView_SetItemText(hlProfileList, i, 1, pf->title);
 	}
 	pfman->UnlockProfileManager();
-	EnableWindow(GetDlgItem(hDlg,IDC_BUTTON3),FALSE);
+	EnableWindow(GetDlgItem(hDlg, IDC_BUTTON2), FALSE);
+	EnableWindow(GetDlgItem(hDlg, IDC_BUTTON3), FALSE);
+	EnableWindow(GetDlgItem(hDlg, IDC_BUTTON4), FALSE);
+	EnableWindow(GetDlgItem(hDlg, IDC_BUTTON5), FALSE);
+	EnableWindow(GetDlgItem(hDlg, IDC_BUTTON6), FALSE);	
 }
 void ProfileWindow::RefreshManifest()
 {

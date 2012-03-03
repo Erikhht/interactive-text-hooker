@@ -580,7 +580,8 @@ void IthInitSystemService()
 		{
 			t = (LPWSTR)base;
 			while (*t-- != L':');
-			obj = (LPWSTR)(base + 0x1A);
+			obj = (LPWSTR)base;
+			while (*obj != L'\\') obj++;
 			break;
 		}
 	}
