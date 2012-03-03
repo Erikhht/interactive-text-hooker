@@ -23,7 +23,7 @@ WCHAR file_path[MAX_PATH]=L"\\??\\";
 LPWSTR current_dir;
 LPVOID page;
 DWORD page_locale;
-DWORD current_process_id,nt_flag,debug;
+DWORD current_process_id,debug;
 HANDLE hHeap, root_obj, dir_obj, codepage_section, thread_man_section;//, thread_man_mutex;
 BYTE LeadByteTable[0x100]={
 	1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
@@ -544,25 +544,6 @@ void CheckThreadStart()
 //NtCreateFile requires full path or a root handle. But this handle is different from object.
 //5. Map shared memory for ThreadStartManager into virtual address space.
 //This will allow IthCreateThread function properly.
-typedef struct 
-{
-	USHORT Length;
-	USHORT MaximumLength;
-	UINT Dummy;
-	PWSTR  Buffer;
-	PVOID  BufferHigh;
-} UNICODE_STRING64;
-typedef struct
-{
-	UNICODE_STRING64	SystemRoot;       // C:\WINNT
-	UNICODE_STRING64	System32Root;     // C:\WINNT\System32
-	UNICODE_STRING64	BaseNamedObjects; // \BaseNamedObjects
-}SYSTEM_STRINGS64,*PSYSTEM_STRINGS64;
-typedef struct
-{
-	BYTE reserved[8];
-	PSYSTEM_STRINGS64	SystemStrings;
-}TEXT_INFO64, *PTEXT_INFO64;
 void IthInitSystemService()
 {
 	PPEB peb;
@@ -574,29 +555,37 @@ void IthInitSystemService()
 	IO_STATUS_BLOCK ios;
 	HANDLE codepage_file;
 	LARGE_INTEGER sec_size={0x1000,0};
-	SYSTEM_PROCESSOR_INFORMATION info;
-	union
-	{
-		TEXT_INFO *ti;
-		TEXT_INFO64 *ti64;
-	};
-	RtlGetNativeSystemInformation(SystemProcessorInformation,&info,sizeof(info),0);
 	__asm
 	{
 		mov eax,fs:[0x18]
 		mov ecx,[eax+0x20]
 		mov eax,[eax+0x30]
 		mov peb,eax
-		mov eax,[eax]
 		mov current_process_id,ecx
-		mov nt_flag,eax
 	}
 	debug = peb->BeingDebugged;
 	LowFragmentHeap=2;
 	hHeap=RtlCreateHeap(0x1002,0,0,0,0,0);
 	RtlSetHeapInformation(hHeap,HeapCompatibilityInformation,&LowFragmentHeap,sizeof(LowFragmentHeap));
+	MEMORY_BASIC_INFORMATION info;
+	NtQueryVirtualMemory(NtCurrentProcess(), peb->ReadOnlySharedMemoryBase,
+		MemoryBasicInformation, &info, sizeof(info), &size);
 
-	ti = peb->ReadOnlyStaticServerData;
+	DWORD base = (DWORD)peb->ReadOnlySharedMemoryBase;
+	DWORD end = base + info.RegionSize - 0x40;
+	static WCHAR windows[] = L"system32";
+	for (;base < end; base += 2)
+	{
+		if (memcmp((PVOID)base, windows, 0x10) == 0)
+		{
+			t = (LPWSTR)base;
+			while (*t-- != L':');
+			obj = (LPWSTR)(base + 0x1A);
+			break;
+		}
+	}
+	if (base == end) NtTerminateProcess(NtCurrentProcess(), 0);
+	/*ti = peb->ReadOnlySharedMemoryBase;
 	if (info.wKeProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64)
 	{
 		obj = ti64->SystemStrings->BaseNamedObjects.Buffer;
@@ -607,7 +596,7 @@ void IthInitSystemService()
 		obj = ti->SystemStrings->BaseNamedObjects.Buffer;
 		t = ti->SystemStrings->System32Root.Buffer;
 	}
-	
+	*/
 	LDR_DATA_TABLE_ENTRY *ldr_entry = (LDR_DATA_TABLE_ENTRY*)peb->Ldr->InLoadOrderModuleList.Flink;
 	wcscpy(file_path+4,ldr_entry->FullDllName.Buffer);
 	current_dir=wcsrchr(file_path,L'\\') + 1;

@@ -1144,19 +1144,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				man->RegisterThreadCreateCallback(ThreadCreate);
 				man->RegisterThreadRemoveCallback(ThreadRemove);
 				man->RegisterThreadResetCallback(ThreadReset);
-				man->AddConsoleOutput(version);
-				man->AddConsoleOutput(InitMessage);
+
 				TextThread* console = man->FindSingle(0);			
 				console->RegisterCallBack(ThreadOutput,0);
 				AddToCombo(console);
 
-				DWORD len = 0;
-				BYTE* str = console->GetStore(&len);
-				SendMessage(hwndEdit, WM_SETTEXT, 0, (LPARAM)str);
 				man->RegisterProcessAttachCallback(RegisterProcessList);
 				man->RegisterProcessDetachCallback(RemoveProcessList);
 				man->RegisterProcessNewHookCallback(RefreshProfileOnNewHook);
 				IHF_Start();
+				man->AddConsoleOutput(version);
+				man->AddConsoleOutput(InitMessage);
 			}
 
 			return 0; 

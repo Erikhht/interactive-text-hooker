@@ -54,7 +54,7 @@ void FreeThreadStart(HANDLE hProc);
 void CheckThreadStart();
 }
 extern HANDLE hHeap;
-extern DWORD current_process_id,nt_flag,debug;
+extern DWORD current_process_id,debug;
 extern BYTE LeadByteTable[];
 extern LPVOID page;
 extern BYTE launch_time[];

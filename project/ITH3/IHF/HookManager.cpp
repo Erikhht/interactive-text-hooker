@@ -417,7 +417,7 @@ void HookManager::RemoveProcessContext(DWORD pid)
 			if (it->PID()==pid)
 			{
 				if (false==Delete(it->GetThreadParameter()))
-					if (nt_flag) __asm int 3
+					if (debug) __asm int 3
 				flag |= (it == current);
 				//flag|=it->RemoveFromCombo();
 				if (it->Number()<new_thread_number)
