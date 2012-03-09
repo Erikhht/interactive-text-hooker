@@ -969,11 +969,10 @@ HANDLE IthCreateThread(LPVOID start_addr, DWORD param, HANDLE hProc)
 
 	//NtReleaseMutant(thread_man_mutex,0);
 
-	if (NT_SUCCESS(NtCreateThread(&hThread,THREAD_ALL_ACCESS,0,hProc,&id,&ctx,&stack,false)))
+	if (NT_SUCCESS(NtCreateThread(&hThread,THREAD_ALL_ACCESS,0,hProc,&id,&ctx,&stack,TRUE)))
 	{
-		//NtGetContextThread(hThread,&ctx);
-		//NtWriteVirtualMemory(hProc,(LPVOID)ctx.Esp,&param,4,&size);
-		//NtResumeThread(hThread,0);
+		NtSetContextThread(hThread,&ctx);
+		NtResumeThread(hThread,0);
 		return hThread;
 	}
 	return INVALID_HANDLE_VALUE;

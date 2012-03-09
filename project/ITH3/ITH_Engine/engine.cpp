@@ -2859,7 +2859,6 @@ DWORD DetermineEngineOther()
 			return 0;
 		}
 	}
-	GetModuleBase();
 	if (IthGetFileInfo(L"*01",static_file_info))
 	{	
 		if (*(DWORD*)static_file_info==0)
