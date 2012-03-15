@@ -24,7 +24,7 @@ LPWSTR current_dir;
 LPVOID page;
 DWORD page_locale;
 DWORD current_process_id,debug;
-HANDLE hHeap, root_obj, dir_obj, codepage_section, thread_man_section;//, thread_man_mutex;
+HANDLE hHeap, root_obj, dir_obj;//, thread_man_mutex;
 BYTE LeadByteTable[0x100]={
 	1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
 	1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
@@ -553,7 +553,7 @@ void IthInitSystemService()
 	DWORD size;
 	OBJECT_ATTRIBUTES oa={sizeof(oa),0,&us,OBJ_CASE_INSENSITIVE,0,0};
 	IO_STATUS_BLOCK ios;
-	HANDLE codepage_file;
+	HANDLE codepage_file, codepage_section, thread_man_section;
 	LARGE_INTEGER sec_size={0x1000,0};
 	__asm
 	{
@@ -630,9 +630,9 @@ void IthInitSystemService()
 		RtlInitUnicodeString(&us,L"JPN_CodePage");	
 		NtCreateSection(&codepage_section,SECTION_MAP_READ,&oa,0,PAGE_READONLY,SEC_COMMIT,codepage_file);
 		NtClose(codepage_file); 
-		size=0;
-		page=0;
+		size=0; page=0;
 		NtMapViewOfSection(codepage_section,NtCurrentProcess(),&page,0,0,0,&size,ViewUnmap,0,PAGE_READONLY);
+		NtClose(codepage_section);
 	}
 
 	RtlInitUnicodeString(&us,L"ITH_SysSection");
@@ -641,7 +641,7 @@ void IthInitSystemService()
 	size=0;
 	NtMapViewOfSection(thread_man_section,NtCurrentProcess(),
 		(PVOID*)&thread_man,0,0,0,&size,ViewUnmap,0,PAGE_EXECUTE_READWRITE);
-
+	NtClose(thread_man_section);
 }
 
 //Release resources allocated by IthInitSystemService.
@@ -651,13 +651,13 @@ void IthCloseSystemService()
 	if (page_locale!=0x3A4)
 	{
 		NtUnmapViewOfSection(NtCurrentProcess(),page);
-		NtClose(codepage_section);
+		//NtClose(codepage_section);
 	}
 	NtUnmapViewOfSection(NtCurrentProcess(),thread_man);
 	RtlDestroyHeap(hHeap);
 	NtClose(root_obj);
 	//NtClose(thread_man_mutex);
-	NtClose(thread_man_section);
+	//NtClose(thread_man_section);
 
 }
 //Check for existence of a file in current folder. Thread safe after init.
@@ -809,6 +809,7 @@ HANDLE IthCreateFileFullPath(LPWSTR path, DWORD option, DWORD share, DWORD dispo
 		return hFile;
 	else return INVALID_HANDLE_VALUE;
 }
+/*
 //Prompt for file name.
 HANDLE IthPromptCreateFile(DWORD option, DWORD share, DWORD disposition)
 {
@@ -834,46 +835,42 @@ HANDLE IthPromptCreateFile(DWORD option, DWORD share, DWORD disposition)
 	}
 	else return INVALID_HANDLE_VALUE;
 }
+*/
 //Create section object for sharing memory between processes.
 //Similar to CreateFileMapping.
 HANDLE IthCreateSection(LPWSTR name, DWORD size, DWORD right)
 {
 	HANDLE hSection;
 	LARGE_INTEGER s={size,0};
+	OBJECT_ATTRIBUTES* poa = 0;
 	if (name)
 	{
 		
 		UNICODE_STRING us;
 		RtlInitUnicodeString(&us,name);
 		OBJECT_ATTRIBUTES oa={sizeof(oa),root_obj,&us,OBJ_OPENIF,0,0};
-		if (NT_SUCCESS(NtCreateSection(&hSection,GENERIC_ALL,&oa,&s,
-			right,SEC_COMMIT,0)))
-			return hSection;
-		else return INVALID_HANDLE_VALUE;
+		poa = &oa;
 	}
-	else
-	{
-		if (NT_SUCCESS(NtCreateSection(&hSection,GENERIC_ALL,0,&s,
-			right,SEC_COMMIT,0)))
-			return hSection;
-		else return INVALID_HANDLE_VALUE;
-	}
+	if (NT_SUCCESS(NtCreateSection(&hSection,GENERIC_ALL,poa,&s,
+		right,SEC_COMMIT,0)))
+		return hSection;
+	else return INVALID_HANDLE_VALUE;
 }
 //Create event object. Similar to CreateEvent.
 HANDLE IthCreateEvent(LPWSTR name, DWORD auto_reset, DWORD init_state)
 {
 	HANDLE hEvent;
+	OBJECT_ATTRIBUTES* poa = 0;
 	if (name)
 	{
 		UNICODE_STRING us;
 		RtlInitUnicodeString(&us,name);
 		OBJECT_ATTRIBUTES oa={sizeof(oa),root_obj,&us,OBJ_OPENIF,0,0};
-		if (NT_SUCCESS(NtCreateEvent(&hEvent,EVENT_ALL_ACCESS,&oa,auto_reset,init_state)))
-			return hEvent;
+		poa = &oa;
 	}
-	else if (NT_SUCCESS(NtCreateEvent(&hEvent,EVENT_ALL_ACCESS,0,auto_reset,init_state)))
-			return hEvent;
-	return INVALID_HANDLE_VALUE;
+	if (NT_SUCCESS(NtCreateEvent(&hEvent,EVENT_ALL_ACCESS,poa,auto_reset,init_state)))
+		return hEvent;
+	else return INVALID_HANDLE_VALUE;
 }
 HANDLE IthOpenEvent(LPWSTR name)
 {
@@ -899,13 +896,14 @@ HANDLE IthCreateMutex(LPWSTR name, BOOL InitialOwner, DWORD* exist)
 {
 	UNICODE_STRING us;
 	HANDLE hMutex; NTSTATUS status;
+	OBJECT_ATTRIBUTES* poa = 0;
 	if (name)
 	{
 		RtlInitUnicodeString(&us,name);
 		OBJECT_ATTRIBUTES oa={sizeof(oa),root_obj,&us,OBJ_OPENIF,0,0};
-		status=NtCreateMutant(&hMutex,MUTEX_ALL_ACCESS,&oa,InitialOwner);
+		poa = &oa;
 	}
-	else status=NtCreateMutant(&hMutex,MUTEX_ALL_ACCESS,0,InitialOwner);
+	status=NtCreateMutant(&hMutex,MUTEX_ALL_ACCESS,poa,InitialOwner);
 	if (NT_SUCCESS(status))
 	{
 		if (exist) *exist=(STATUS_OBJECT_NAME_EXISTS==status);

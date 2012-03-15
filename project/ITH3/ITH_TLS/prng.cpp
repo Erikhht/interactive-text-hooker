@@ -18,8 +18,8 @@
 
 #include "aes256.h"
 #include "prng.h"
-#include "sha.h"
-
+//#include "sha.h"
+#include <ITH\Hash.h>
 void PRNGInit(PRNGContext* ctx)
 {
 	unsigned int seed;

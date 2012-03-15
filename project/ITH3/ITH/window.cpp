@@ -22,7 +22,7 @@
 #include <intrin.h>
 #include <ITH\IHF.h>
 #include <ITH\IHF_SYS.h>
-#include <ITH\ITH_TLS.h>
+#include <ITH\Hash.h>
 #include <ITH\HookManager.h>
 #include <ITH\version.h>
 #define CMD_SIZE 0x200
@@ -2427,12 +2427,11 @@ bool ProfileWindow::RefreshGames(const char* name)
 }
 bool ProfileWindow::RefreshGamesInMemory(LPVOID memory, DWORD size, const char* hash)
 {
-	HashCalculator* sha256 = ITH_TLS_NewHashCalculator(HashTypeSHA256);
-	sha256->HashUpdate(memory,size);
+	SHA256Calc sha256;
+	sha256.HashUpdate(memory,size);
 	BYTE values[0x20];
-	sha256->HashFinal(values);
-	bool flag = CheckHashStr(values, sha256->HashValueSize(), hash);
-	ITH_TLS_DestroyHashCalculator(sha256);
+	sha256.HashFinal(values);
+	bool flag = CheckHashStr(values, sha256.HashValueSize(), hash);
 	if (flag)
 	{
 		game_list.Clear();

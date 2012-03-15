@@ -70,6 +70,8 @@ public:
 	virtual void ResetRepeatStatus();
 	virtual void ClearCurrent();
 	virtual void AddLink(WORD from, WORD to);
+	virtual void UnLink(WORD from);
+	virtual void UnLinkAll(WORD from);
 	virtual void SelectCurrent(DWORD num);
 	virtual void DetachProcess(DWORD pid);
 	virtual void SetCurrent(TextThread* it);

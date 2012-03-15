@@ -19,7 +19,7 @@
 #define ITH_TLS
 #include <ITH\ITH_TLS.h>
 #include <ITH\ntdll.h>
-#include "sha.h"
+//#include "sha.h"
 #include "socket.h"
 #include "arithmetic.h"
 //#include "tls.h"

@@ -84,7 +84,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>ITH_TinyXmlLib.lib;comctl32.lib;ITH_TLS.lib;ITH_SYS.lib;IHF.lib;ntdll.lib;msvcrt_native.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ITH_Hashlib.lib;ITH_TinyXmlLib.lib;ITH_TLS.lib;ITH_SYS.lib;IHF.lib;ntdll.lib;msvcrt_native.lib;comctl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>
       <EntryPointSymbol>main</EntryPointSymbol>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>

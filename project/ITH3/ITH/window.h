@@ -21,7 +21,6 @@
 #include <ITH\main_template.h>
 #include <ITH\common.h>
 #include <ITH\CustomFilter.h>
-#include <ITH\ITH_TLS.h>
 int GetHookString(LPWSTR str, DWORD pid, DWORD hook_addr, DWORD status);
 //SYSTEM_PROCESS_INFORMATION* GetBaseByPid(BYTE* pbBuffer,DWORD dwPid);
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);

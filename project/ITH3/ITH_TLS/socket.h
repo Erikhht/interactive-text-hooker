@@ -18,7 +18,7 @@
 #ifndef ITH_SOCKET
 #define ITH_SOCKET
 #include "aes256.h"
-#include "sha.h"
+#include <ITH\Hash.h>
 #include <ITH\AVL.h>
 #ifndef ITH_TLS_SOCKET
 #define ITH_TLS_SOCKET

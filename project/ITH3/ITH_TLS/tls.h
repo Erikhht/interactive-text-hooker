@@ -19,8 +19,8 @@
 #define ITH_TLS_HEADER
 #include "aes256.h"
 #include "hmac.h"
-#include "sha.h"
 #include "socket.h"
+#include <ITH\Hash.h>
 #include <ITH\mem.h>
 class PHashGen
 {

@@ -17,7 +17,7 @@
 
 #ifndef ITH_HMAC
 #define ITH_HMAC
-#include "sha.h"
+#include <ITH\Hash.h>
 #define HMAC_BLOCK_SIZE 64
 class HMAC_Calc
 {
@@ -31,4 +31,5 @@ private:
 	char opad[HMAC_BLOCK_SIZE];
 	HashCalculator* hash_calc;
 };
+int HMAC(void* key, int len_key, void* msg, int len_msg, void* hmac, HashCalculator*);
 #endif

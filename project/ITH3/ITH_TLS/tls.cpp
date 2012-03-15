@@ -16,12 +16,11 @@
  */
 
 #include <windows.h>
-//#include <time.h>
 #include "tls.h"
 #include "prng.h"
 #include "x509.h"
 #include "arithmetic.h"
-#include <ith\ntdll.h>
+#include <ITH\ntdll.h>
 void* AllocateMemory(unsigned int size)
 {
 	LPVOID buffer = 0;

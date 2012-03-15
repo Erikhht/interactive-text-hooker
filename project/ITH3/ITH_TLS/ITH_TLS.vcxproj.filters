@@ -30,9 +30,6 @@
     <ClCompile Include="prng.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sha.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="socket.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -51,9 +48,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="prng.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="sha.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="sizedef.h">

@@ -19,20 +19,10 @@
 #include "ITH.h"
 #include "language.h"
 #include <windows.h>
-void ConsoleOutput(LPCWSTR)
+void ConsoleOutput(LPCWSTR text)
 {
 
 }
-/*DWORD Hash(LPWSTR module, int length = -1)
-{
-	bool flag=(length==-1);
-	DWORD hash=0;
-	for (;*module&&(flag||length--);module++)
-	{
-		hash=((hash>>7)|(hash<<25))+(*module);
-	}
-	return hash;
-}*/
 int Convert(LPWSTR str, DWORD *num, LPWSTR delim)
 {
 	if (num == 0) return -1;
@@ -78,7 +68,7 @@ bool Parse(LPWSTR cmd, HookParam& hp)
 		if (t < 0) 
 		{
 _error:
-			ConsoleOutput(L"Syntax error.");
+			//ConsoleOutput(L"Syntax error.");
 			return false;
 		}
 		offset = wcschr(offset , delim[t]);
@@ -204,6 +194,7 @@ DWORD ProcessCommand(LPWSTR cmd, DWORD pid)
 	case L'/':
 		switch (cmd[1])
 		{
+
 		case L'p':
 			{			
 				if (cmd[2] == L'n') 
@@ -223,7 +214,8 @@ DWORD ProcessCommand(LPWSTR cmd, DWORD pid)
 			}
 			break;
 		default:
-			ConsoleOutput(ErrorSyntax);
+			break;
+			//ConsoleOutput(ErrorSyntax);
 		}
 		break;
 	case L'l':
@@ -232,6 +224,22 @@ DWORD ProcessCommand(LPWSTR cmd, DWORD pid)
 			swscanf(cmd+1, L"%x-%x", &from, &to);
 			IHF_AddLink(from, to);
 		}
+		break;
+	case L'u':
+		{
+			DWORD from;
+			if (cmd[1] == L'a')
+			{
+				if (swscanf(cmd + 2, L"%x",&from) == 1)
+					IHF_UnLinkAll(from);
+			}
+			else
+			{
+				if (swscanf(cmd + 1, L"%x",&from) == 1)
+					IHF_UnLink(from);
+			}
+		}
+
 		break;
 	default:
 		break;

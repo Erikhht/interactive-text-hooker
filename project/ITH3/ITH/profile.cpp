@@ -19,7 +19,7 @@
 #include "ITH.h"
 #include <ITH\IHF.h>
 #include <ITH\IHF_SYS.h>
-#include <ITH\ITH_TLS.h>
+#include <ITH\Hash.h>
 #include <ITH\ntdll.h>
 #include "profile.h"
 extern bool Parse(LPWSTR cmd, HookParam& hp);
@@ -91,8 +91,9 @@ extern const DWORD EngineHookNameSize = sizeof(EngineHookName) / sizeof (LPWSTR)
 
 bool CheckFileHash(TiXmlElement* hash, LPWSTR path)
 {
-	HashCalculator *md5,*sha1,*sha256;
-	md5 = sha1 = sha256 = 0;
+	MD5Calc *md5 = 0;
+	SHA1Calc *sha1 = 0;
+	SHA256Calc *sha256 = 0;
 	WCHAR nt_path[MAX_PATH];
 	DWORD len = wcslen(path);
 	if (len >= MAX_PATH - 4) return false;
@@ -104,9 +105,9 @@ bool CheckFileHash(TiXmlElement* hash, LPWSTR path)
 
 	bool flag = true;
 
-	if (hash->Attribute("MD5")) md5 = ITH_TLS_NewHashCalculator(HashTypeMD5);
-	if (hash->Attribute("SHA1")) sha1 = ITH_TLS_NewHashCalculator(HashTypeSHA1);
-	if (hash->Attribute("SHA256")) sha256 = ITH_TLS_NewHashCalculator(HashTypeSHA256);
+	if (hash->Attribute("MD5")) md5 = new MD5Calc;
+	if (hash->Attribute("SHA1")) sha1 = new SHA1Calc;
+	if (hash->Attribute("SHA256")) sha256 = new SHA256Calc;
 
 	if (md5 || sha1 || sha256)
 	{
@@ -148,9 +149,9 @@ bool CheckFileHash(TiXmlElement* hash, LPWSTR path)
 		}
 	}
 
-	if (md5) ITH_TLS_DestroyHashCalculator(md5);
-	if (sha1) ITH_TLS_DestroyHashCalculator(sha1);
-	if (sha256) ITH_TLS_DestroyHashCalculator(sha256);
+	if (md5) delete md5;
+	if (sha1) delete sha1;
+	if (sha256) delete sha256;
 	NtClose(hFile);
 	return flag;
 }
@@ -176,11 +177,8 @@ void InsertHashNode(LPWSTR path, TiXmlElement* file)
 	{
 		hash->Clear();
 	}
-	//HashCalculator *md5,*sha1;
-	HashCalculator *sha256;
-	//md5 = ITH_TLS_NewHashCalculator(HashTypeMD5);
-	//sha1 = ITH_TLS_NewHashCalculator(HashTypeSHA1);
-	sha256 = ITH_TLS_NewHashCalculator(HashTypeSHA256);
+
+	SHA256Calc sha256;;
 
 	FILE_STANDARD_INFORMATION info;
 	IO_STATUS_BLOCK ios;
@@ -194,13 +192,13 @@ void InsertHashNode(LPWSTR path, TiXmlElement* file)
 		NtReadFile(hFile, 0,0,0, &ios, buffer, size, 0,0);
 		//md5->HashUpdate(buffer, size);
 		//sha1->HashUpdate(buffer, size);
-		sha256->HashUpdate(buffer, size);
+		sha256.HashUpdate(buffer, size);
 		info.EndOfFile.QuadPart -= size;
 	}
 	NtReadFile(hFile, 0,0,0, &ios, buffer, info.EndOfFile.LowPart, 0,0);
 	//md5->HashUpdate(buffer, info.EndOfFile.LowPart);
 	//sha1->HashUpdate(buffer, info.EndOfFile.LowPart);
-	sha256->HashUpdate(buffer, info.EndOfFile.LowPart);
+	sha256.HashUpdate(buffer, info.EndOfFile.LowPart);
 	char hash_str[0x80],hash_value[0x20];
 
 	/*hash_size = md5->HashValueSize();
@@ -217,16 +215,14 @@ void InsertHashNode(LPWSTR path, TiXmlElement* file)
 	hash_str[hash_size << 1] = 0;
 	hash->SetAttribute("SHA1",hash_str);*/	
 
-	hash_size = sha256->HashValueSize();
-	sha256->HashFinal(hash_value);
+	hash_size = sha256.HashValueSize();
+	sha256.HashFinal(hash_value);
 	for (i = 0; i < hash_size; i++)
 		ByteToHexStr(hash_str + (i << 1), hash_value[i]);
 	hash_str[hash_size << 1] = 0;
 	hash->SetAttribute("SHA256",hash_str);
 
-	//ITH_TLS_DestroyHashCalculator(md5);
-	//ITH_TLS_DestroyHashCalculator(sha1);
-	ITH_TLS_DestroyHashCalculator(sha256);
+
 	NtFreeVirtualMemory(NtCurrentProcess(), &buffer, &size, MEM_RELEASE);
 	NtClose(hFile);
 }

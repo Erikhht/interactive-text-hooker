@@ -424,3 +424,13 @@ IHFSERVICE DWORD IHFAPI IHF_AddLink(DWORD from, DWORD to)
 	man->AddLink(from & 0xFFFF, to & 0xFFFF);
 	return 0;
 }
+IHFSERVICE DWORD IHFAPI IHF_UnLink(DWORD from)
+{
+	man->UnLink(from & 0xFFFF);
+	return 0;
+}
+IHFSERVICE DWORD IHFAPI IHF_UnLinkAll(DWORD from)
+{
+	man->UnLinkAll(from & 0xFFFF);
+	return 0;
+}

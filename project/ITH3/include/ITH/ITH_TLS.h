@@ -16,36 +16,13 @@
  */
 
 #pragma once
-
+#include <ITH\Hash.h>
 #ifdef ITH_TLS
 #define ITH_TLS_SERVICE __declspec(dllexport)
 #else
 #define ITH_TLS_SERVICE __declspec(dllimport)
 #endif
 #define ITH_TLS_API __stdcall
-
-#ifndef ITH_TLS_HASH_CALC
-#define ITH_TLS_HASH_CALC
-
-class HashCalculator
-{
-public:
-	HashCalculator() {}
-	virtual ~HashCalculator() {}
-	virtual void HashInit() = 0;
-	virtual void HashUpdate(void* msg, int len) = 0;
-	virtual void HashFinal(void* hash) = 0;
-	virtual int HashValueSize() const = 0;
-	virtual int HashBlockSize() const = 0;
-};
-
-enum HashType
-{
-	HashTypeMD5 = 0,
-	HashTypeSHA1,
-	HashTypeSHA256
-};
-#endif
 
 #ifndef ITH_TLS_SOCKET
 #define ITH_TLS_SOCKET

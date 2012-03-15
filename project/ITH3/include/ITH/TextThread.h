@@ -53,14 +53,16 @@ public:
 	TextThread(DWORD pid, DWORD hook, DWORD retn, DWORD spl, WORD num);
 	virtual ~TextThread();	
 	virtual void CopyLastSentence(LPWSTR str);
-	virtual void SetComment(LPWSTR);
-	virtual bool CheckCycle(TextThread* start);
+	virtual void SetComment(LPWSTR);	
 	virtual void ExportTextToFile(LPWSTR filename);
+	
+	virtual bool CheckCycle(TextThread* start);
 	virtual DWORD GetThreadString(LPWSTR str, DWORD max);
 	virtual DWORD GetEntryString(LPWSTR str, DWORD max = 0x200);
 
 	void Reset();
-	void AddToStore(BYTE* con,int len, bool new_line=false, bool console=false);
+	void AddText(BYTE* con,int len, bool new_line=false, bool console=false);
+	void AddTextDirect(BYTE* con, int len);
 	void RemoveSingleRepeatAuto(BYTE* con, int &len);
 	void RemoveSingleRepeatForce(BYTE* con, int &len);
 	void RemoveCyclicRepeat(BYTE* &con, int &len);
@@ -68,7 +70,7 @@ public:
 	void AddLineBreak();
 	void ResetEditText();
 	void ComboSelectCurrent();
-
+	void UnLinkAll();
 	void CopyLastToClipboard();
 	
 	//void AdjustPrevRepeat(DWORD len);

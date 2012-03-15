@@ -172,7 +172,7 @@ void ThreadTable::SetThread(DWORD num, TextThread* ptr)
 }
 TextThread* ThreadTable::FindThread(DWORD number)
 {
-	if ((int)number<=used)
+	if (number<=(DWORD)used)
 		return storage[number];
 	else return 0;
 }
@@ -596,6 +596,40 @@ void HookManager::AddLink(WORD from, WORD to)
 		AddConsoleOutput(ErrorLink);
 	LeaveCriticalSection(&hmcs);
 }
+void HookManager::UnLink(WORD from)
+{
+	bool flag=false;
+	TextThread *from_thread;
+	EnterCriticalSection(&hmcs);
+	from_thread=thread_table->FindThread(from);
+
+	if (from_thread)
+	{
+		from_thread->Link() = 0;
+		from_thread->LinkNumber() = 0xFFFF;
+		AddConsoleOutput(L"Link deleted.");
+	}
+	else 
+		AddConsoleOutput(L"Thread not exist.");
+	LeaveCriticalSection(&hmcs);
+}
+void HookManager::UnLinkAll(WORD from)
+{
+	bool flag=false;
+	TextThread *from_thread;
+	EnterCriticalSection(&hmcs);
+	from_thread=thread_table->FindThread(from);
+
+	if (from_thread)
+	{
+		from_thread->UnLinkAll();
+		AddConsoleOutput(L"Link deleted.");
+	}
+	else 
+		AddConsoleOutput(L"Thread not exist.");
+	LeaveCriticalSection(&hmcs);
+}
+
 void HookManager::DispatchText(DWORD pid, BYTE* text, DWORD hook, DWORD retn, DWORD spl, int len)
 {
 	bool flag=false;
@@ -630,7 +664,7 @@ void HookManager::DispatchText(DWORD pid, BYTE* text, DWORD hook, DWORD retn, DW
 		
 		
 	}
-	it->AddToStore(text,len,false,number==0);
+	it->AddText(text,len,false,number==0);
 	LeaveCriticalSection(&hmcs);	
 }
 void HookManager::AddConsoleOutput(LPCWSTR text)
@@ -640,8 +674,8 @@ void HookManager::AddConsoleOutput(LPCWSTR text)
 		int len=wcslen(text)<<1;
 		TextThread *console=thread_table->FindThread(0);
 		//EnterCriticalSection(&hmcs);
-		console->AddToStore((BYTE*)text,len,false,true);
-		console->AddToStore((BYTE*)L"\r\n",4,false,true);
+		console->AddText((BYTE*)text,len,false,true);
+		console->AddText((BYTE*)L"\r\n",4,false,true);
 		//LeaveCriticalSection(&hmcs);
 	}
 }

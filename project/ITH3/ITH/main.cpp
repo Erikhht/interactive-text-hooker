@@ -19,7 +19,6 @@
 #include <ITH\ntdll.h>
 #include <ITH\IHF_SYS.h>
 #include <ITH\CustomFilter.h>
-#include <ITH\ITH_TLS.h>
 #include <windows.h>
 #include <CommCtrl.h>
 #include "profile.h"
@@ -343,7 +342,7 @@ int main()
 	IthCreateMutex(L"ITH_MAIN_RUNNING",TRUE);
 	if (IHF_Init())
 	{
-		//ITH_TLS_Init();
+
 		SetUnhandledExceptionFilter(unhandled_except);
 		IHF_GetHookManager(&man);
 		IHF_GetSettingManager(&setman);
@@ -353,7 +352,7 @@ int main()
 
 		LoadSettings();
 		setman->SetValue(SETTING_SPLIT_TIME,split_time);
-		//setman->SetValue(SETTING_CYCLIC_REMOVE,cyclic_remove);
+
 		setman->SetValue(SETTING_CLIPFLAG,clipboard_flag);
 		hIns = GetModuleBase();
 		MyRegisterClass(hIns);
@@ -369,7 +368,7 @@ int main()
 		delete uni_filter;
 		delete pfman;
 		man = 0;
-		//ITH_TLS_Cleanup();
+
 	}
 	else
 	{

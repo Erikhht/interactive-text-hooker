@@ -19,6 +19,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ITH_TinyXmlLib", "ITH_TinyX
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ITH_Updater", "ITH_Updater\ITH_Updater.vcxproj", "{230FE842-693E-4FAF-A849-06E254DAC9E3}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ITH_HashLib", "ITH_HashLib\ITH_HashLib.vcxproj", "{BCD1D8D8-A13F-4295-BB93-4C634D8214EA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -61,6 +63,10 @@ Global
 		{230FE842-693E-4FAF-A849-06E254DAC9E3}.Debug|Win32.Build.0 = Debug|Win32
 		{230FE842-693E-4FAF-A849-06E254DAC9E3}.Release|Win32.ActiveCfg = Release|Win32
 		{230FE842-693E-4FAF-A849-06E254DAC9E3}.Release|Win32.Build.0 = Release|Win32
+		{BCD1D8D8-A13F-4295-BB93-4C634D8214EA}.Debug|Win32.ActiveCfg = Debug|Win32
+		{BCD1D8D8-A13F-4295-BB93-4C634D8214EA}.Debug|Win32.Build.0 = Debug|Win32
+		{BCD1D8D8-A13F-4295-BB93-4C634D8214EA}.Release|Win32.ActiveCfg = Release|Win32
+		{BCD1D8D8-A13F-4295-BB93-4C634D8214EA}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

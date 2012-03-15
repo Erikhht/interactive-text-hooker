@@ -54,7 +54,7 @@ void CALLBACK NewLineConsole(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTim
 	KillTimer(hwnd,idEvent);
 	TextThread *id=(TextThread*)idEvent;
 	if (id->Status()&USING_UNICODE)
-		id->AddToStore((BYTE*)L"\r\n",4,true,true);
+		id->AddText((BYTE*)L"\r\n",4,true,true);
 	if (id->Status()&CURRENT_SELECT)
 	{
 		//texts->SetLine();
@@ -404,14 +404,14 @@ void TextThread::AddLineBreak()
 	{
 		prev_sentence=last_sentence;
 		sentence_length=0;
-		if (status&USING_UNICODE) MyVector::AddToStore((BYTE*)L"\r\n\r\n",8);
-		else MyVector::AddToStore((BYTE*)"\r\n\r\n",4);
+		if (status&USING_UNICODE) AddToStore((BYTE*)L"\r\n\r\n",8);
+		else AddToStore((BYTE*)"\r\n\r\n",4);
 		if (callback) callback(this,0,8,TRUE,app_data);
 		last_sentence=used;
 		status&=~BUFF_NEWLINE;
 	}
 }
-void TextThread::AddToStore(BYTE* con,int len, bool new_line,bool console)
+void TextThread::AddText(BYTE* con,int len, bool new_line,bool console)
 {
 	if (con == 0 || len <=0) return;
 	if (!console)
@@ -469,14 +469,14 @@ void TextThread::AddToStore(BYTE* con,int len, bool new_line,bool console)
 		{
 			BYTE* send=con;
 			int l=len;
-			if (status&USING_UNICODE)
+			if (status&USING_UNICODE) //Although unlikely, a thread and its link may have different encoding.
 			{
 				if ((link->Status()&USING_UNICODE)==0)
 				{
 					send=new BYTE[l];
 					l=WC_MB((LPWSTR)con,(char*)send);
 				}
-				link->AddToStore(send,l);
+				link->AddTextDirect(send,l);
 			}
 			else
 			{
@@ -485,7 +485,7 @@ void TextThread::AddToStore(BYTE* con,int len, bool new_line,bool console)
 					send=new BYTE[len*2+2];
 					l=MB_WC((char*)con,(LPWSTR)send)<<1;
 				}
-				link->AddToStore(send,l);
+				link->AddTextDirect(send,l);
 			}
 			link->SetNewLineTimer();
 			if (send!=con) delete send;
@@ -494,16 +494,47 @@ void TextThread::AddToStore(BYTE* con,int len, bool new_line,bool console)
 	}
 
 	if (callback) len = callback(this,con,len, new_line,app_data);
-	if (MyVector::AddToStore(con,len))
+	if (AddToStore(con,len))
 	{
 		ResetRepeatStatus();
 		last_sentence=0;
 		prev_sentence=0;
 		sentence_length=len;
 		repeat_index=0;
-		status&=~REPEAT_DETECT|REPEAT_SUPPRESS;
-		
+		status&=~REPEAT_DETECT|REPEAT_SUPPRESS;		
 	}
+}
+void TextThread::AddTextDirect(BYTE* con, int len) //Add to store directly, penetrating repetition filters.
+{
+	SetNewLineTimer();
+	if (link)
+	{
+		BYTE* send=con;
+		int l=len;
+		if (status&USING_UNICODE)
+		{
+			if ((link->Status()&USING_UNICODE)==0)
+			{
+				send=new BYTE[l];
+				l=WC_MB((LPWSTR)con,(char*)send);
+			}
+			link->AddText(send,l);
+		}
+		else
+		{
+			if (link->Status()&USING_UNICODE)
+			{
+				send=new BYTE[len*2+2];
+				l=MB_WC((char*)con,(LPWSTR)send)<<1;
+			}
+			link->AddText(send,l);
+		}
+		link->SetNewLineTimer();
+		if (send!=con) delete send;
+	}
+	sentence_length+=len;
+	if (callback) len = callback(this,con,len,false,app_data);
+	AddToStore(con,len);
 }
 DWORD TextThread::GetEntryString(LPWSTR str, DWORD max)
 {
@@ -701,7 +732,6 @@ void TextThread::SetNewLineTimer()
 	else
 		timer=SetTimer(hMainWnd,(UINT_PTR)this,setman->GetValue(SETTING_SPLIT_TIME),NewLineBuff);
 }
-
 DWORD TextThread::GetThreadString( LPWSTR str, DWORD max )
 {
 	WCHAR buffer[0x200],c;
@@ -724,4 +754,10 @@ DWORD TextThread::GetThreadString( LPWSTR str, DWORD max )
 	}
 
 	return len;
+}
+void TextThread::UnLinkAll()
+{
+	if (link) link->UnLinkAll();
+	link = 0;
+	link_number = -1;
 }
