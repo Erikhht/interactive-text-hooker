@@ -58,6 +58,7 @@ public:
 	void RefreshThread(int index);
 	void RefreshThreadColumns(DWORD pid);
 	bool PerformThread(DWORD pid, DWORD tid, ThreadOperation op=OutputInformation, DWORD addr=0);
+	bool PerformThread(PVOID system_thread);
 	DWORD GetSelectPID();
 private:
 	HWND hDlg;

@@ -506,7 +506,8 @@ void TextThread::AddText(BYTE* con,int len, bool new_line,bool console)
 }
 void TextThread::AddTextDirect(BYTE* con, int len) //Add to store directly, penetrating repetition filters.
 {
-	SetNewLineTimer();
+	if (status&BUFF_NEWLINE) AddLineBreak();
+	//SetNewLineTimer();
 	if (link)
 	{
 		BYTE* send=con;

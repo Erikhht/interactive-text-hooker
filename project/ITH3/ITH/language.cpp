@@ -37,8 +37,8 @@ const wchar_t* ErrorNoAttach=L"No process attached.";
 const wchar_t* ErrorMonitor=L"Can't monitor process.";
 //utility.cpp
 const wchar_t* InitMessage=L"Copyright (C) 2010-2012  kaosu (qiupf2000@gmail.com)\r\n\
-Source code <http://code.google.com/p/interactive-text-hooker/>\r\n\
-General discussion <http://www.hongfire.com/forum/showthread.php?t=208860>";
+Source code <https://code.google.com/p/interactive-text-hooker/>\r\n\
+General discussion <https://groups.google.com/forum/?fromgroups#!forum/interactive-text-hooker>";
 const wchar_t* BackgroundMsg=L"If you feel tired about the pure white background,\r\n\
 put your favorite picture in ITH folder and name it 'background.bmp'\r\n";
 const wchar_t* ErrorLinkExist=L"Link exist.";

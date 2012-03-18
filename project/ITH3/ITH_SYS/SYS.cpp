@@ -24,7 +24,7 @@ LPWSTR current_dir;
 LPVOID page;
 DWORD page_locale;
 DWORD current_process_id,debug;
-HANDLE hHeap, root_obj, dir_obj;//, thread_man_mutex;
+HANDLE hHeap, root_obj, dir_obj, codepage_section, thread_man_section;
 BYTE LeadByteTable[0x100]={
 	1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
 	1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
@@ -553,7 +553,7 @@ void IthInitSystemService()
 	DWORD size;
 	OBJECT_ATTRIBUTES oa={sizeof(oa),0,&us,OBJ_CASE_INSENSITIVE,0,0};
 	IO_STATUS_BLOCK ios;
-	HANDLE codepage_file, codepage_section, thread_man_section;
+	HANDLE codepage_file;
 	LARGE_INTEGER sec_size={0x1000,0};
 	__asm
 	{
@@ -586,18 +586,6 @@ void IthInitSystemService()
 		}
 	}
 	if (base == end) NtTerminateProcess(NtCurrentProcess(), 0);
-	/*ti = peb->ReadOnlySharedMemoryBase;
-	if (info.wKeProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64)
-	{
-		obj = ti64->SystemStrings->BaseNamedObjects.Buffer;
-		t = ti64->SystemStrings->System32Root.Buffer;
-	}
-	else
-	{
-		obj = ti->SystemStrings->BaseNamedObjects.Buffer;
-		t = ti->SystemStrings->System32Root.Buffer;
-	}
-	*/
 	LDR_DATA_TABLE_ENTRY *ldr_entry = (LDR_DATA_TABLE_ENTRY*)peb->Ldr->InLoadOrderModuleList.Flink;
 	wcscpy(file_path+4,ldr_entry->FullDllName.Buffer);
 	current_dir=wcsrchr(file_path,L'\\') + 1;
@@ -631,8 +619,7 @@ void IthInitSystemService()
 		NtCreateSection(&codepage_section,SECTION_MAP_READ,&oa,0,PAGE_READONLY,SEC_COMMIT,codepage_file);
 		NtClose(codepage_file); 
 		size=0; page=0;
-		NtMapViewOfSection(codepage_section,NtCurrentProcess(),&page,0,0,0,&size,ViewUnmap,0,PAGE_READONLY);
-		NtClose(codepage_section);
+		NtMapViewOfSection(codepage_section,NtCurrentProcess(),&page,0,0,0,&size,ViewUnmap,0,PAGE_READONLY);		
 	}
 
 	RtlInitUnicodeString(&us,L"ITH_SysSection");
@@ -641,7 +628,7 @@ void IthInitSystemService()
 	size=0;
 	NtMapViewOfSection(thread_man_section,NtCurrentProcess(),
 		(PVOID*)&thread_man,0,0,0,&size,ViewUnmap,0,PAGE_EXECUTE_READWRITE);
-	NtClose(thread_man_section);
+	
 }
 
 //Release resources allocated by IthInitSystemService.
@@ -651,13 +638,12 @@ void IthCloseSystemService()
 	if (page_locale!=0x3A4)
 	{
 		NtUnmapViewOfSection(NtCurrentProcess(),page);
-		//NtClose(codepage_section);
+		NtClose(codepage_section);
 	}
 	NtUnmapViewOfSection(NtCurrentProcess(),thread_man);
 	RtlDestroyHeap(hHeap);
 	NtClose(root_obj);
-	//NtClose(thread_man_mutex);
-	//NtClose(thread_man_section);
+	NtClose(thread_man_section);
 
 }
 //Check for existence of a file in current folder. Thread safe after init.
@@ -963,12 +949,14 @@ HANDLE IthCreateThread(LPVOID start_addr, DWORD param, HANDLE hProc)
 	ctx.Edx=0xFFFFFFFF;
 	ctx.Esp=(DWORD)stack.ExpandableStackBase-0x10;
 	ctx.Ebp=param;
-	//NtWaitForSingleObject(thread_man_mutex,0,0);
-
-	//NtReleaseMutant(thread_man_mutex,0);
 
 	if (NT_SUCCESS(NtCreateThread(&hThread,THREAD_ALL_ACCESS,0,hProc,&id,&ctx,&stack,TRUE)))
 	{
+		//On x64 Windows, NtCreateThread in ntdll calls NtCreateThread in ntoskrnl via WOW64,
+		//which maps 32-bit system call to the correspond 64-bit version.
+		//This layer doesn't correctly copying whole CONTEXT structure, so we must set it manually
+		//after the thread is created.
+		//On x86 Windows, this step is not necessary.
 		NtSetContextThread(hThread,&ctx);
 		NtResumeThread(hThread,0);
 		return hThread;

@@ -806,7 +806,7 @@ void LoadBMP(HWND hWnd)
 				NtReadFile(hFile, 0, 0, 0, &ios, buffer1, info.biWidth*info.biHeight*info.biBitCount/8, &size, 0);
 			}
 			
-			NtClose(hFile);
+			
 			GetObject(hbmp, sizeof(bmp), &bmp);
 			SelectObject(hCompDC, hbmp);		
 			SelectObject(hBlackDC, hBlackBmp);
@@ -819,6 +819,7 @@ void LoadBMP(HWND hWnd)
 			DeleteDC(hCompDC);
 			DeleteObject(hbmp);
 		}
+		NtClose(hFile);
 	}
 	ReleaseDC(hwndEdit, hDC);
 }
@@ -1160,6 +1161,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				IHF_Start();
 				man->AddConsoleOutput(version);
 				man->AddConsoleOutput(InitMessage);
+				if (background == 0) man->AddConsoleOutput(BackgroundMsg);
 			}
 
 			return 0; 
@@ -1854,7 +1856,7 @@ void ProcessWindow::RefreshThreadColumns(DWORD pid)
 	//int i = 0;
 	while ((DWORD)base < dwLimit)
 	{
-		PerformThread(base -> Cid.UniqueProcess, base -> Cid.UniqueThread);
+		PerformThread(base);
 		LPWSTR state= (base -> dThreadState == StateWait)?				
 			WaitReasonString[base -> WaitReason] : StateString[base -> dThreadState];
 		ListView_SetItemText(hlThread, 0, 3, state);
@@ -1862,6 +1864,38 @@ void ProcessWindow::RefreshThreadColumns(DWORD pid)
 		//i++;
 	}
 	NtFreeVirtualMemory(NtCurrentProcess(), &pBuffer, &dwSize, MEM_RELEASE);
+}
+bool ProcessWindow::PerformThread(PVOID system_thread)
+{
+	PSYSTEM_THREAD st = (PSYSTEM_THREAD)system_thread;
+	HANDLE hThread, hProc;
+	NTSTATUS status;
+	PVOID address = 0;
+	OBJECT_ATTRIBUTES oa = {sizeof(oa)};
+	if (!NT_SUCCESS(NtOpenThread(&hThread, THREAD_QUERY_INFORMATION, &oa, &st->Cid))) return false;
+	
+	status = NtQueryInformationThread(hThread, ThreadQuerySetWin32StartAddress, &address, sizeof(address), 0);
+	if (!NT_SUCCESS(status)) return false;
+	if (address == 0) address = st->pStartAddress;
+	NtClose(hThread);
+	LVITEM item={};
+	item.mask = LVIF_TEXT | LVIF_PARAM | LVIF_STATE; 
+
+	WCHAR name[0x100], str[0x100];
+	item.pszText = str;
+	if (!NT_SUCCESS(NtOpenProcess(&hProc, PROCESS_QUERY_INFORMATION, &oa, &st->Cid)))
+		return false;
+
+	swprintf(str, L"%d", st->Cid.UniqueThread);
+	item.lParam = st->Cid.UniqueThread;
+	ListView_InsertItem(hlThread, &item);
+	swprintf(str, L"%X", address);
+	ListView_SetItemText(hlThread, item.iItem, 1, str);
+	if (NT_SUCCESS(NtQueryVirtualMemory(hProc, address,
+		MemorySectionName, name, 0x200, 0)))
+		ListView_SetItemText(hlThread, item.iItem, 2, wcsrchr(name, L'\\') + 1);
+	NtClose(hProc);
+	return true;
 }
 bool ProcessWindow::PerformThread(DWORD pid, DWORD tid, ThreadOperation op, DWORD addr)
 {
