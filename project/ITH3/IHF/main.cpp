@@ -20,6 +20,7 @@
 #include <ITH\ntdll.h>
 #include <ITH\IHF_SYS.h>
 #include <ITH\CustomFilter.h>
+#include <CommCtrl.h>
 
 #define IHF
 #include <ITH\IHF.h>
@@ -76,6 +77,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 		IthInitSystemService();
 		GetDebugPriv();
 		//Used by timers.
+		InitCommonControls();
 		hMainWnd = CreateWindow(L"Button", L"InternalWindow", 0, 0, 0, 0, 0, 0, 0, hinstDLL, 0);
 		break;
 	case DLL_PROCESS_DETACH:

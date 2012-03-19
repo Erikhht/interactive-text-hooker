@@ -1634,28 +1634,34 @@ void InsertBrunsHook()
 		k = module_limit - 4;
 		for (i = module_base + 0x1000; i < k; i++)
 		{
-			if (*id == 0xFF) //cmp reg,0xFF
+			if (*id != 0xFF) continue;//cmp reg,0xFF		
+			i += 4;
+			if (*iw != 0x8F0F) continue;//jg
+			i += 2;
+			i += *id + 4;
+			for (j = i + 0x40; i < j; i++)
 			{
-				i += 4;
-				if (*iw == 0x8F0F) //jg
+				if (*ib != 0xE8) continue;
+				i++;
+				t = i + 4 + *id;
+				if (t > module_base && t <module_limit)
 				{
-					i += 2;
-					i += *id + 4;
-					for (j = i + 0x40; i < j; i++)
+					i = t;
+					for (j = i + 0x80; i < j; i++)
 					{
-						if (*ib == 0xE8)
+						if (*ib != 0xE8) continue;
+						i++;
+						t = i + 4 + *id;
+						if (t > module_base && t <module_limit)
 						{
-							i++;
-							t = i + 4 + *id;
-							if (t > module_base && t <module_limit)
-							{
-								hp.addr = t;
-								NewHook(hp, L"Bruns");
-								return;
-							}
+							hp.addr = t;
+							hp.type |= DATA_INDIRECT;
+							NewHook(hp, L"Bruns");
+							return;
 						}
 					}
-					
+					k = i; //Terminate outer loop.
+					break; //Terminate inner loop.
 				}
 			}
 		}

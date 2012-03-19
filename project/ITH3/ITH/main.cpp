@@ -20,7 +20,7 @@
 #include <ITH\IHF_SYS.h>
 #include <ITH\CustomFilter.h>
 #include <windows.h>
-#include <CommCtrl.h>
+
 #include "profile.h"
 
 //ProfileManager* pfman;
@@ -356,7 +356,7 @@ int main()
 		setman->SetValue(SETTING_CLIPFLAG,clipboard_flag);
 		hIns = GetModuleBase();
 		MyRegisterClass(hIns);
-		InitCommonControls();
+		
 		InitInstance(hIns,IHF_IsAdmin(),&window);
 		MSG msg;
 		while (GetMessage(&msg, NULL, 0, 0))
