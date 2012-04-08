@@ -1122,8 +1122,8 @@ DWORD WINAPI InjectThread(LPVOID lpThreadParameter)
 }
 DWORD WINAPI MonitorThread(LPVOID lpThreadParameter)
 {
-	SetEnvironmentVariable(L"__COMPAT_LAYER", L"#ApplicationLocale");
-	SetEnvironmentVariable(L"AppLocaleID", L"0411");
+	//SetEnvironmentVariable(L"__COMPAT_LAYER", L"#ApplicationLocale");
+	//SetEnvironmentVariable(L"AppLocaleID", L"0411");
 
 	DWORD size, rs;
 	LPVOID addr; 

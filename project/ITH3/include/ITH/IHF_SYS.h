@@ -25,7 +25,7 @@ int MB_WC(char* mb, wchar_t* wc);
 int MB_WC_count(char* mb, int mb_length);
 int WC_MB(wchar_t *wc, char* mb);
 DWORD SearchPattern(DWORD base, DWORD base_length, LPVOID search, DWORD search_length); //KMP
-void IthInitSystemService();
+BOOL IthInitSystemService();
 void IthCloseSystemService();
 DWORD IthGetMemoryRange(LPVOID mem, DWORD* base, DWORD* size);
 BOOL IthCheckFile(LPWSTR file);

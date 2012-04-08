@@ -47,7 +47,6 @@ GLOBAL CRITICAL_SECTION detach_cs;
 DWORD WINAPI RecvThread(LPVOID lpThreadParameter);
 DWORD WINAPI CmdThread(LPVOID lpThreadParameter);
 
-void CopyToClipboard(void* str,bool unicode, int len);
 void ConsoleOutput(LPCWSTR text);
 DWORD	GetCurrentPID();
 DWORD	GetProcessIDByPath(LPWSTR str);

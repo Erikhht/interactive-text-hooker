@@ -20,10 +20,7 @@
 #include <ITH\IHF_SYS.h>
 #include <ITH\CustomFilter.h>
 #include <windows.h>
-
 #include "profile.h"
-
-//ProfileManager* pfman;
 HookManager* man;
 HINSTANCE hIns;
 ATOM MyRegisterClass(HINSTANCE hInstance);
@@ -307,7 +304,7 @@ HINSTANCE GetModuleBase()
 		mov eax,[eax+0x8]
 	}
 }
-LONG WINAPI unhandled_except(_EXCEPTION_POINTERS *ExceptionInfo)
+LONG WINAPI UnhandledExcept(_EXCEPTION_POINTERS *ExceptionInfo)
 {
 	WCHAR code[0x10],name[0x200];
 	EXCEPTION_RECORD* rec = ExceptionInfo->ExceptionRecord;
@@ -338,12 +335,14 @@ LONG WINAPI unhandled_except(_EXCEPTION_POINTERS *ExceptionInfo)
 }
 int main()
 {
-	IthInitSystemService();	
+	if (!IthInitSystemService()) 
+	{
+		NtTerminateProcess(NtCurrentProcess(), 0);
+	}
 	IthCreateMutex(L"ITH_MAIN_RUNNING",TRUE);
 	if (IHF_Init())
 	{
-
-		SetUnhandledExceptionFilter(unhandled_except);
+		SetUnhandledExceptionFilter(UnhandledExcept);
 		IHF_GetHookManager(&man);
 		IHF_GetSettingManager(&setman);
 		pfman = new ProfileManager;
@@ -363,7 +362,7 @@ int main()
 		{
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
-		}		
+		}
 		delete mb_filter;
 		delete uni_filter;
 		delete pfman;

@@ -709,34 +709,52 @@ rUGP hook:
 	characters. It's determining if ebp contains a SHIFT-JIS character. This function is not likely
 	to be used in other ways. We simply search for this instruction and place hook around.
 ********************************************************************************************/
+void SpecialHookRUGP(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+{
+	DWORD* stack = (DWORD*)esp_base;
+	DWORD i,val;
+	for (i = 0; i < 4; i++)
+	{
+		val = *stack++;
+		if ((val>>16) == 0) break;
+		
+	}
+	if (i < 4)
+	{
+		hp.off = i << 2;
+		*data = val;
+		*len = 2;
+		hp.type &= ~EXTERN_HOOK;
+	}
+	else
+	{
+		*len = 0;
+	}
+}
 void InsertRUGPHook()
 {
 	DWORD low,high,t;
 	if (FillRange(L"rvmm.dll",&low,&high)==0) goto rt;
 	WCHAR str[0x40];
 	LPVOID ch=(LPVOID)0x8140;
+
 	t=SearchPattern(low+0x20000,high-low-0x20000,&ch,4)+0x20000;
 	BYTE* s=(BYTE*)(low+t);
-	if (s[-2]!=0x81) goto rt;
+	if (*(s-2)!=0x81) goto rt;
 	if (t!=-1)
 	{
-		
-		for (int i=0;i<0x200;i++,s--)
-			if (s[0]==0x90)
-				if (*(DWORD*)(s-3)==0x90909090)
-				{
-					t=low+t-i+1;
-					//swprintf(str,L"HookAddr 0x%.8x",t);
-					//OutputConsole(str);
-					HookParam hp={};
-					hp.addr=t;
-					hp.off=0x4;
-					hp.length_offset=1;
-					hp.type|=BIG_ENDIAN;
-					NewHook(hp,L"rUGP");
-					//RegisterEngineType(ENGINE_RUGP);
-					return;
-				}
+		DWORD i = FindEntryAligned((DWORD)s, 0x200);
+		if (i != 0)
+		{
+			HookParam hp={};
+			hp.addr=i;
+			//hp.off= -8;
+			hp.length_offset=1;
+			hp.extern_fun=(DWORD)SpecialHookRUGP;
+			hp.type|=BIG_ENDIAN|EXTERN_HOOK;
+			NewHook(hp,L"rUGP");
+			return;
+		}
 	}
 	else
 	{
@@ -1084,7 +1102,47 @@ bool InsertShinaHook()
 bool InsertWaffleDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 {
 	if (addr != GetTextExtentPoint32A) return false;
-	DWORD retn,limit,str;
+	DWORD handler;
+	union
+	{
+		DWORD i;
+		BYTE* ib;
+		DWORD* id;
+	};
+	__asm
+	{
+		mov eax,fs:[0]
+		mov eax,[eax]
+		mov eax,[eax]
+		mov eax,[eax]
+		mov eax,[eax]
+		mov eax,[eax]
+		mov ecx, [eax + 4]
+		mov handler, ecx
+	}
+
+	DWORD j,k,t;
+
+	k = module_limit - 4;
+	for (i = module_base + 0x1000; i < j; i++)
+	{
+		if (*id != handler) continue;
+		if (*(ib - 1) != 0x68) continue;
+		t = FindEntryAligned(i, 0x40);
+		if (t)
+		{
+			HookParam hp = {};
+			hp.addr = t;
+			hp.off = 8;
+			hp.ind = 4;
+			hp.length_offset = 1;
+			hp.type = DATA_INDIRECT;
+			NewHook(hp, L"Waffle");
+			return true;
+		}
+	}
+	return true;
+	/*DWORD retn,limit,str;
 	WORD ch;
 	NTSTATUS status;
 	MEMORY_BASIC_INFORMATION info;
@@ -1092,17 +1150,20 @@ bool InsertWaffleDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 	ch = *(WORD*)str;
 	if (ch<0x100) return false;
 	limit = (stack | 0xFFFF) + 1;
+	__asm int 3
 	for (stack += 0x10; stack < limit; stack += 4)
 	{
 		str = *(DWORD*)stack;
-		if ((str >> 16) == (stack >> 16)) continue; //No stack
-		status = NtQueryVirtualMemory(NtCurrentProcess(),(PVOID)str,MemoryBasicInformation,&info,sizeof(info),0);
-		if (!NT_SUCCESS(status) || info.Protect & PAGE_NOACCESS) continue; //Accessible
+		if ((str >> 16) != (stack >> 16))
+		{
+			status = NtQueryVirtualMemory(NtCurrentProcess(),(PVOID)str,MemoryBasicInformation,&info,sizeof(info),0);
+			if (!NT_SUCCESS(status) || info.Protect & PAGE_NOACCESS) continue; //Accessible
+		}
 		if (*(WORD*)(str + 4) == ch) break;
 	}
 	if (stack < limit)
 	{
-		for (limit = stack + 0x80; stack < limit ; stack += 4)
+		for (limit = stack + 0x100; stack < limit ; stack += 4)
 		if (*(DWORD*)stack == -1)
 		{
 			retn = *(DWORD*)(stack + 4);
@@ -1122,7 +1183,7 @@ bool InsertWaffleDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 
 		}
 
-	}
+	}*/
 	OutputConsole(L"Unknown waffle engine.");
 	return true;
 
@@ -1142,7 +1203,6 @@ void InsertWaffleHook()
 			hp.split=0x1E8;
 			hp.type=DATA_INDIRECT|USING_SPLIT;
 			NewHook(hp,L"WAFFLE");
-			//RegisterEngineType(ENGINE_WAFFLE);
 			return;
 		}
 	}
@@ -2408,7 +2468,7 @@ void SpecialHookWillPlus(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* spli
 	};
 	retn = *(DWORD*)esp_base;
 	i = 0;
-	while (*pw != 0xC483)
+	while (*pw != 0xC483) //add esp, $
 	{
 		l = disasm(pb);
 		if (++i == 5)
@@ -2956,7 +3016,7 @@ DWORD DetermineNoHookEngine()
 }
 DWORD DetermineEngineType()
 {
-	OutputConsole(L"Engine support module 2012.2.27");
+	OutputConsole(L"Engine support module 2012.4.8");
 	if (DetermineEngineByFile1()==0) return 0;
 	if (DetermineEngineByFile2()==0) return 0;
 	if (DetermineEngineByFile3()==0) return 0;

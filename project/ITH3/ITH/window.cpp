@@ -72,7 +72,6 @@ typedef BOOL (CALLBACK* EditFun)(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPa
 typedef BOOL (*PostEditFun)(HWND hlEdit, HWND hcmb);
 static HINSTANCE hIns;
 
-
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
 	WNDCLASSEX wcex;
@@ -1241,8 +1240,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case WM_ERASEBKGND:
 			return 1;
 		case WM_DESTROY:
-			//running = false;
-			//DeleteCriticalSection(&update_cs);
+
 			man->RegisterThreadCreateCallback(0);
 			man->RegisterThreadRemoveCallback(0);
 			man->RegisterThreadResetCallback(0);

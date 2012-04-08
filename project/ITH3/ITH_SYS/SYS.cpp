@@ -215,7 +215,7 @@ public:
 		NtWriteVirtualMemory(hProc, buffer, normal_routine, 0x14, 0);
 		*(DWORD*)(normal_routine + ADDR0) -= base;
 		b += 0x14;
-		fun_table[0] = NtTerminateThread;
+		fun_table[0] = NtTerminateProcess;
 		fun_table[1] = NtQueryVirtualMemory;
 		fun_table[2] = MessageBoxW;
 		NtWriteVirtualMemory(hProc, buffer, fun_table, 0xC, 0);
@@ -544,13 +544,14 @@ void CheckThreadStart()
 //NtCreateFile requires full path or a root handle. But this handle is different from object.
 //5. Map shared memory for ThreadStartManager into virtual address space.
 //This will allow IthCreateThread function properly.
-void IthInitSystemService()
+BOOL IthInitSystemService()
 {
 	PPEB peb;
-	ULONG LowFragmentHeap; 
 	LPWSTR t,obj;
-	UNICODE_STRING us;
+	NTSTATUS status;
 	DWORD size;
+	ULONG LowFragmentHeap; 
+	UNICODE_STRING us;
 	OBJECT_ATTRIBUTES oa={sizeof(oa),0,&us,OBJ_CASE_INSENSITIVE,0,0};
 	IO_STATUS_BLOCK ios;
 	HANDLE codepage_file;
@@ -561,16 +562,16 @@ void IthInitSystemService()
 		mov ecx,[eax+0x20]
 		mov eax,[eax+0x30]
 		mov peb,eax
-		mov current_process_id,ecx
+			mov current_process_id,ecx
 	}
 	debug = peb->BeingDebugged;
 	LowFragmentHeap=2;
 	hHeap=RtlCreateHeap(0x1002,0,0,0,0,0);
 	RtlSetHeapInformation(hHeap,HeapCompatibilityInformation,&LowFragmentHeap,sizeof(LowFragmentHeap));
 	MEMORY_BASIC_INFORMATION info;
-	NtQueryVirtualMemory(NtCurrentProcess(), peb->ReadOnlySharedMemoryBase,
+	status = NtQueryVirtualMemory(NtCurrentProcess(), peb->ReadOnlySharedMemoryBase,
 		MemoryBasicInformation, &info, sizeof(info), &size);
-
+	if (!NT_SUCCESS(status)) return FALSE;
 	DWORD base = (DWORD)peb->ReadOnlySharedMemoryBase;
 	DWORD end = base + info.RegionSize - 0x40;
 	static WCHAR system32[] = L"system32";
@@ -585,17 +586,18 @@ void IthInitSystemService()
 			break;
 		}
 	}
-	if (base == end) NtTerminateProcess(NtCurrentProcess(), 0);
+	if (base == end) return FALSE;
 	LDR_DATA_TABLE_ENTRY *ldr_entry = (LDR_DATA_TABLE_ENTRY*)peb->Ldr->InLoadOrderModuleList.Flink;
 	wcscpy(file_path+4,ldr_entry->FullDllName.Buffer);
 	current_dir=wcsrchr(file_path,L'\\') + 1;
 	*current_dir = 0;
 	RtlInitUnicodeString(&us,file_path);
-	NtOpenFile(&dir_obj,FILE_LIST_DIRECTORY|FILE_TRAVERSE|SYNCHRONIZE,
+	status = NtOpenFile(&dir_obj,FILE_LIST_DIRECTORY|FILE_TRAVERSE|SYNCHRONIZE,
 		&oa,&ios,FILE_SHARE_READ|FILE_SHARE_WRITE,FILE_DIRECTORY_FILE|FILE_SYNCHRONOUS_IO_NONALERT);
-
+	if (!NT_SUCCESS(status)) return FALSE;
 	RtlInitUnicodeString(&us,obj);
-	NtOpenDirectoryObject(&root_obj,READ_CONTROL|0xF,&oa);
+	status = NtOpenDirectoryObject(&root_obj,READ_CONTROL|0xF,&oa);
+	if (!NT_SUCCESS(status)) return FALSE;
 
 	page = peb->InitAnsiCodePageData;
 	page_locale = *(DWORD*)page >> 16;
@@ -612,23 +614,29 @@ void IthInitSystemService()
 		if (*(t-1)!=L'\\') *t++=L'\\';
 		wcscpy(t,L"C_932.nls");
 		RtlInitUnicodeString(&us,file_path);
-		NtOpenFile(&codepage_file,FILE_READ_DATA,&oa,&ios,FILE_SHARE_READ,0);
+		status = NtOpenFile(&codepage_file,FILE_READ_DATA,&oa,&ios,FILE_SHARE_READ,0);
+		if (!NT_SUCCESS(status)) return FALSE;
 		oa.hRootDirectory=root_obj;
 		oa.uAttributes|=OBJ_OPENIF;
 		RtlInitUnicodeString(&us,L"JPN_CodePage");	
-		NtCreateSection(&codepage_section,SECTION_MAP_READ,&oa,0,PAGE_READONLY,SEC_COMMIT,codepage_file);
+		status = NtCreateSection(&codepage_section,SECTION_MAP_READ,
+			&oa,0,PAGE_READONLY,SEC_COMMIT,codepage_file);
+		if (!NT_SUCCESS(status)) return FALSE;
 		NtClose(codepage_file); 
 		size=0; page=0;
-		NtMapViewOfSection(codepage_section,NtCurrentProcess(),&page,0,0,0,&size,ViewUnmap,0,PAGE_READONLY);		
+		status = NtMapViewOfSection(codepage_section,NtCurrentProcess(),
+			&page,0,0,0,&size,ViewUnmap,0,PAGE_READONLY);		
+		if (!NT_SUCCESS(status)) return FALSE;
 	}
 
 	RtlInitUnicodeString(&us,L"ITH_SysSection");
-	NtCreateSection(&thread_man_section,SECTION_ALL_ACCESS,&oa,&sec_size,
+	status = NtCreateSection(&thread_man_section,SECTION_ALL_ACCESS,&oa,&sec_size,
 		PAGE_EXECUTE_READWRITE,SEC_COMMIT,0); 
+	if (!NT_SUCCESS(status)) return FALSE;
 	size=0;
-	NtMapViewOfSection(thread_man_section,NtCurrentProcess(),
+	status = NtMapViewOfSection(thread_man_section,NtCurrentProcess(),
 		(PVOID*)&thread_man,0,0,0,&size,ViewUnmap,0,PAGE_EXECUTE_READWRITE);
-	
+	return NT_SUCCESS(status);
 }
 
 //Release resources allocated by IthInitSystemService.
@@ -954,7 +962,7 @@ HANDLE IthCreateThread(LPVOID start_addr, DWORD param, HANDLE hProc)
 	{
 		//On x64 Windows, NtCreateThread in ntdll calls NtCreateThread in ntoskrnl via WOW64,
 		//which maps 32-bit system call to the correspond 64-bit version.
-		//This layer doesn't correctly copying whole CONTEXT structure, so we must set it manually
+		//This layer doesn't correctly copy whole CONTEXT structure, so we must set it manually
 		//after the thread is created.
 		//On x86 Windows, this step is not necessary.
 		NtSetContextThread(hThread,&ctx);

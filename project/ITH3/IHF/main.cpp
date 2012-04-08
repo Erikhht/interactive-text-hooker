@@ -160,7 +160,13 @@ void ConsoleOutput(LPCWSTR text)
 {
 	man->AddConsoleOutput(text);
 }
-
+#define IHS_SIZE 0x80
+#define IHS_BUFF_SIZE (IHS_SIZE - sizeof(HookParam))
+struct InsertHookStruct
+{
+	SendParam sp;
+	BYTE name_buffer[IHS_SIZE];
+};
 IHFSERVICE DWORD IHFAPI IHF_Init()
 {
 	BOOL result = false;
@@ -353,13 +359,6 @@ IHFSERVICE DWORD IHFAPI IHF_GetSettingManager(SettingManager** set_man)
 	}
 	else return 1;
 }
-#define IHS_SIZE 0x80
-#define IHS_BUFF_SIZE (IHS_SIZE - sizeof(HookParam))
-struct InsertHookStruct
-{
-	SendParam sp;
-	BYTE name_buffer[IHS_SIZE];
-};
 IHFSERVICE DWORD IHFAPI IHF_InsertHook(DWORD pid, HookParam* hp, LPWSTR name)
 {
 	InsertHookStruct s;

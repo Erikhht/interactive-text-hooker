@@ -646,7 +646,7 @@ static char clipboard_buffer[0x400];
 void CopyToClipboard(void* str,bool unicode, int len)
 {
 	if (setman->GetValue(SETTING_CLIPFLAG))
-	if (str)
+	if (str && len > 0)
 	{
 		int size=(len*2|0xF)+1;
 		if (len>=0x3FE) return;

@@ -1,6 +1,6 @@
 Copyright (C) 2010-2012  kaosu (qiupf2000@gmail.com)
 Source code is available at <http://code.google.com/p/interactive-text-hooker/>
-General discussion at <http://www.hongfire.com/forum/showthread.php?t=208860>
+General discussion at <https://groups.google.com/forum/?fromgroups#!forum/interactive-text-hooker>
 
 Interactive Text Hooker is free software: you can redistribute it and/or
 modify it under the terms of the GNU General Public License as published

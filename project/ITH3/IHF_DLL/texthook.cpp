@@ -583,6 +583,8 @@ int TextHook::GetLength(DWORD base, DWORD in)
 			if (hp.type&USING_UNICODE) len<<=1;
 			break;
 		}
+		else if (len != -1) break;
+		//len == -1 then continue to case 0.
 	case 0:
 		if (hp.type&USING_UNICODE) len=wcslen((LPWSTR)in)<<1;
 		else len=strlen((char*)in);

@@ -18,8 +18,7 @@
 #pragma once
 #include <ITH\TextThread.h>
 #include <ITH\AVL.h>
-//typedef DWORD (*ThreadCreateCallback) (TextThread*);
-//typedef DWORD (*ThreadRemoveCallback) (TextThread*);
+
 #define MAX_REGISTER 0xF
 #define MAX_PREV_REPEAT_LENGTH 0x20
 struct ProcessRecord {
@@ -86,7 +85,7 @@ public:
 	void RegisterProcess(DWORD pid, DWORD hookman, DWORD module, DWORD engine);
 	void UnRegisterProcess(DWORD pid);
 	void SetName(DWORD);
-	//void SetProcessEngineType(DWORD pid, DWORD type);
+
 	DWORD GetCurrentPID();
 	HANDLE GetCmdHandleByPID(DWORD pid);
 
