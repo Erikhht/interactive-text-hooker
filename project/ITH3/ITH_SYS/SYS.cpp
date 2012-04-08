@@ -215,7 +215,7 @@ public:
 		NtWriteVirtualMemory(hProc, buffer, normal_routine, 0x14, 0);
 		*(DWORD*)(normal_routine + ADDR0) -= base;
 		b += 0x14;
-		fun_table[0] = NtTerminateProcess;
+		fun_table[0] = NtTerminateThread;
 		fun_table[1] = NtQueryVirtualMemory;
 		fun_table[2] = MessageBoxW;
 		NtWriteVirtualMemory(hProc, buffer, fun_table, 0xC, 0);
