@@ -212,7 +212,7 @@ DWORD TextHook::Send(DWORD dwDataBase, DWORD dwRetn)
 			dwSplit=*(DWORD*)(dwDataBase+hp.split);
 			if (dwType&SPLIT_INDIRECT) 
 			{
-				if (IthGetMemoryRange((LPVOID)(dwDataIn+hp.split_ind),0,0))
+				if (IthGetMemoryRange((LPVOID)(dwSplit+hp.split_ind),0,0))
 					dwSplit=*(DWORD*)(dwSplit+hp.split_ind);
 				else return 0;
 			}
