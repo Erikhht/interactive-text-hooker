@@ -1156,7 +1156,7 @@ DWORD WINAPI MonitorThread(LPVOID lpThreadParameter)
 				((DWORD)spiProcessInfo + spiProcessInfo -> dNext);
 
 			if (!auto_inject || man->GetProcessRecord(spiProcessInfo->dUniqueProcessId)) continue;
-			if (!auto_inject) continue;
+
 			if (GetProcessPath(spiProcessInfo -> dUniqueProcessId, process_path))
 			{
 				if (pfman -> IsPathProfile(process_path))

@@ -286,9 +286,8 @@ DWORD SyncFile(HANDLE hFile, char* link, char* last_modified)
 		"Host: %s\r\n"
 		"Connection: keep-alive\r\n"
 		"User-Agent: ITH 3.0\r\n"
-		"If-Modified-Since: %s\r\n"
 		"\r\n";
-	len = sprintf(buffer, format, ptr, link, last_modified);
+	len = sprintf(buffer, format, ptr, link);
 
 	if (!connected)
 	{

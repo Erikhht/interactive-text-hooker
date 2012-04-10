@@ -323,7 +323,7 @@ KiriKiri hook:
 	string. After the loop EBX will point to the end of the string. So EBX-2 is the last
 	char and we insert hook here to extract it.
 ********************************************************************************************/
-void SpecialHookKiriKiri(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+void SpecialHookKiriKiri(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* split, DWORD* len)
 {
 	DWORD p1,p2,p3;
 	p1=*(DWORD*)(esp_base-0x14);
@@ -577,7 +577,7 @@ void InsertRealliveHook()
 	SwitchTrigger(true);
 	trigger_fun=InsertRealliveDynamicHook;
 }
-void SpecialHookSiglus(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+void SpecialHookSiglus(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* split, DWORD* len)
 {
 	__asm
 	{
@@ -639,7 +639,7 @@ MAJIRO hook:
 	just do memory comparisons and get the value working for current release.
 
 ********************************************************************************************/
-void SpecialHookMajiro(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+void SpecialHookMajiro(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* split, DWORD* len)
 {
 	__asm
 	{
@@ -709,7 +709,7 @@ rUGP hook:
 	characters. It's determining if ebp contains a SHIFT-JIS character. This function is not likely
 	to be used in other ways. We simply search for this instruction and place hook around.
 ********************************************************************************************/
-void SpecialHookRUGP(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+void SpecialHookRUGP(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* split, DWORD* len)
 {
 	DWORD* stack = (DWORD*)esp_base;
 	DWORD i,val;
@@ -721,10 +721,11 @@ void SpecialHookRUGP(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, D
 	}
 	if (i < 4)
 	{
-		hp.off = i << 2;
+		hp->off = i << 2;
 		*data = val;
 		*len = 2;
-		hp.type &= ~EXTERN_HOOK;
+		hp->extern_fun = 0;
+		hp->type &= ~EXTERN_HOOK;
 	}
 	else
 	{
@@ -980,7 +981,7 @@ ShinaRio hook:
 
 	New ShinaRio engine (>=2.48) uses different approach.
 ********************************************************************************************/
-void SpecialHookShina(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+void SpecialHookShina(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* split, DWORD* len)
 {
 	DWORD ptr=*(DWORD*)(esp_base-0x20);
 	*split=ptr;
@@ -1394,14 +1395,14 @@ void InsertRetouchHook()
 		hp.off=4;
 		hp.type=USING_STRING;
 		NewHook(hp,L"RetouchSystem");
-		//RegisterEngineType(ENGINE_RETOUCH);
+		return;
 	}
 	else if (GetFunctionAddr("?printSub@RetouchPrintManager@@AAEXPBDKAAH1@Z",&hp.addr,0,0,0))
 	{
 		hp.off=4;
 		hp.type=USING_STRING;
 		NewHook(hp,L"RetouchSystem");
-		//RegisterEngineType(ENGINE_RETOUCH);
+		return;
 	}
 	OutputConsole(L"Unknown RetouchSystem engine.");
 }
@@ -1468,7 +1469,7 @@ void InsertEMEHook()
 	}
 	else OutputConsole(L"Unknown EmonEngine engine");
 }
-void SpecialRunrunEngine(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+void SpecialRunrunEngine(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* split, DWORD* len)
 {
 	DWORD p1=*(DWORD*)(esp_base-0x8)+*(DWORD*)(esp_base-0x10); //eax+edx
 	*data=*(WORD*)(p1);
@@ -1530,7 +1531,7 @@ void InsertMEDHook()
 	OutputConsole(L"Unknown MED engine.");
 }
 static DWORD furi_flag;
-void SpecialHookMalie(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+void SpecialHookMalie(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* split, DWORD* len)
 {
 	DWORD index,ch,ptr;
 	ch=*(DWORD*)(esp_base-0x8)&0xFFFF;
@@ -1841,7 +1842,7 @@ Apricot hook:
 	Only name and text data is needed. 
 
 ********************************************************************************************/
-void SpecialHookApricot(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+void SpecialHookApricot(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* split, DWORD* len)
 {
 	DWORD reg_esi=*(DWORD*)(esp_base-0x20);
 	DWORD reg_esp=*(DWORD*)(esp_base-0x18);
@@ -2002,16 +2003,16 @@ bool IsPensilSetup()
 	NtFreeVirtualMemory(NtCurrentProcess(), &buffer, &info.AllocationSize.LowPart, MEM_RELEASE);
 	return result;
 }
-void SpecialHookDebonosu(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+void SpecialHookDebonosu(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* split, DWORD* len)
 {
 	DWORD retn = *(DWORD*)esp_base;
 	if (*(WORD*)retn == 0xC483) //add esp, *
-		hp.off = 4;
+		hp->off = 4;
 	else
-		hp.off = -0x8;
-	hp.type ^= EXTERN_HOOK;
-	hp.extern_fun = 0;
-	*data = *(DWORD*)(esp_base + hp.off);
+		hp->off = -0x8;
+	hp->type ^= EXTERN_HOOK;
+	hp->extern_fun = 0;
+	*data = *(DWORD*)(esp_base + hp->off);
 	*len = strlen((char*)*data);
 }
 DWORD FindImportEntry(DWORD hModule, DWORD fun)
@@ -2069,7 +2070,7 @@ void InsertDebonosuHook()
 	}
 	OutputConsole(L"Unknown Debonosu engine.");
 }
-void SpecialHookSofthouse(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+void SpecialHookSofthouse(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* split, DWORD* len)
 {
 	DWORD i;
 	union
@@ -2078,7 +2079,7 @@ void SpecialHookSofthouse(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* spl
 		PCHAR string_a;
 	};
 	string_u=*(LPWSTR*)(esp_base+4);
-	if (hp.type&USING_UNICODE)
+	if (hp->type&USING_UNICODE)
 	{
 		*len=wcslen(string_u);
 		for (i=0;i<*len;i++)
@@ -2147,9 +2148,9 @@ void InsertSoftHouseHook()
 	SwitchTrigger(true);
 	trigger_fun=InsertSofthouseDynamicHook;
 }
-void SpecialHookCaramelBox(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+void SpecialHookCaramelBox(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* split, DWORD* len)
 {
-	DWORD reg_ecx = *(DWORD*)(esp_base+hp.off);
+	DWORD reg_ecx = *(DWORD*)(esp_base+hp->off);
 	BYTE* ptr = (BYTE*)reg_ecx;
 	buffer_index = 0;
 	while (ptr[0])
@@ -2363,7 +2364,7 @@ typedef struct _NSTRING
 	DWORD lenWithoutNull; 
 	WCHAR str[1];
 } NSTRING;
-void SpecialHookAB2Try(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+void SpecialHookAB2Try(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* split, DWORD* len)
 {
 	DWORD test = *(DWORD*)(esp_base - 0x10);
 	if (test != 0) return;
@@ -2455,7 +2456,7 @@ void InsertC4Hook()
 	}
 	else OutputConsole(L"Unknown C4 engine");
 }
-void SpecialHookWillPlus(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+void SpecialHookWillPlus(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* split, DWORD* len)
 {
 
 	static DWORD detect_offset;
@@ -2480,10 +2481,10 @@ void SpecialHookWillPlus(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* spli
 	}
 	if (*pw == 0xC483)
 	{
-		hp.off = *(pb + 2) - 8;
-		hp.type ^= EXTERN_HOOK;
-		hp.extern_fun = 0;
-		char* str = *(char**)(esp_base + hp.off);
+		hp->off = *(pb + 2) - 8;
+		hp->type ^= EXTERN_HOOK;
+		hp->extern_fun = 0;
+		char* str = *(char**)(esp_base + hp->off);
 		*data = (DWORD)str;
 		*len = strlen(str);
 		*split = 0;
@@ -2550,7 +2551,7 @@ DWORD FindNextCall(DWORD start, DWORD range, DWORD base, DWORD limit, DWORD* fun
 	}
 	return 0;
 }
-void SpecialHookRyokucha(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* split, DWORD* len)
+void SpecialHookRyokucha(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* split, DWORD* len)
 {
 	DWORD *base = (DWORD*)esp_base;
 	DWORD i, j;
@@ -2559,10 +2560,11 @@ void SpecialHookRyokucha(DWORD esp_base, HookParam& hp, DWORD* data, DWORD* spli
 		j = base[i];
 		if ((j >> 16) == 0 && (j >> 8))
 		{
-			hp.off = i << 2;
+			hp->off = i << 2;
 			*data = j;
 			*len = 2;
-			hp.type &= ~EXTERN_HOOK;
+			hp->type &= ~EXTERN_HOOK;
+			hp->extern_fun = 0;
 			return;
 		}
 	}
