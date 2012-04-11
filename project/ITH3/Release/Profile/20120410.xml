@@ -1,7 +1,7 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ITH_Profile>
     <Game Title="WHITE ALBUM -綴られる冬の想い出-">
-        <File Name="main.exe">
+        <File Name="WHITE ALBUM.exe">
             <Hash SHA256="EFED53397B75951B50F40DDD6A747B015A2DF4891649A1FBFA8DEAF237541FA9" />
         </File>
         <Profile>
