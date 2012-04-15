@@ -261,7 +261,11 @@ BOOL CALLBACK ThreadDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				thwnd -> SetThread();
 				break;
 			case IDC_BUTTON2:
-				thwnd -> ExportSingleThreadText();
+				{
+					HWND combo = GetDlgItem(hDlg, IDC_COMBO1);
+					thwnd -> ExportSingleThreadText(SendMessage(combo, CB_GETCURSEL, 0, 0), 0);
+				}
+				
 				break;
 			case IDC_BUTTON3:
 				thwnd -> ExportAllThreadText();
@@ -2143,12 +2147,8 @@ void ThreadWindow::SetLastSentence(DWORD number)
 void ThreadWindow::ExportAllThreadText()
 {
 	WCHAR str_buffer[0x200];
-	LPWSTR str, dir, p;
-	LARGE_INTEGER time;
-	TIME_FIELDS tf;
-	TextThread* it;
-	DWORD len, max;
-	max = 0x1FF;
+	LPWSTR str, dir;
+	DWORD len, count, i;
 	len = GetWindowText(hwndProc, str_buffer, 0x200);
 	if (len)
 	{
@@ -2159,52 +2159,34 @@ void ThreadWindow::ExportAllThreadText()
 		str_buffer[len] = L'.';		
 		for (str = str_buffer; *str != L'.'; str++);
 		*str = 0;
-		max -= str - str_buffer;
 		HANDLE h = IthCreateDirectory(dir);
 		if (INVALID_HANDLE_VALUE == h) return;
 		NtClose(h);
 	}
 	else return;
-	ThreadTable* table = man -> Table();
-	NtQuerySystemTime(&time);
-	IthSystemTimeToLocalTime(&time);
-	RtlTimeToTimeFields(&time, &tf);
-	*str++=L'\\';
-	tf.wYear = tf.wYear%100;
-
-	str += swprintf(str, L"%.2d%.2d%.2d-%.2d%.2d-", tf.wYear, tf.wMonth, tf.wDay, tf.wHour, tf.wMinute);
-	len = str - str_buffer + 5;
-	man -> LockHookman();
-	for (int i = 0; i <= table -> Used(); i++)
-	{		
-		it = table -> FindThread(i);
-		if (it == 0) continue;
-		p = str + swprintf(str,L"%.4X-",it->Number());
-		DWORD tl = it->GetThreadString(p, max - len);
-		p += tl;
-		if (tl + len + 0x10 < max)
-		{
-			p[0] = L'.'; p[1] = L't';
-			p[2] = L'x'; p[3] = L't';
-			p[4] = 0;
-			it -> ExportTextToFile(dir);
-		}
+	count = SendMessage(hcCurrentThread, CB_GETCOUNT, 0, 0);
+	man->LockHookman();
+	for (i = 0; i < count; i++)
+	{
+		ExportSingleThreadText(i, dir);
 	}
-	man -> UnlockHookman();
-
-	p = dir;
-	dir[max] = L'\\';
-	for (p = dir; *p != L'\\'; p++);
-	if (p == dir + max) return;
-	*p = 0;
-	ShellExecute(0, L"open", dir, 0, 0, SW_SHOWNORMAL);
+	man->UnlockHookman();
 }
-void ThreadWindow::ExportSingleThreadText()
+//\/:*?"<>| are not allowed in file name.
+static BYTE forbidden_table[0x10]=
+{
+	0,0,0,0, //0-1f
+	0x4,0x84,0,0xD4, //20-3f
+	0,0,0,0x10, //40-5f
+	0,0,0,0x10, //60-7f
+};
+
+void ThreadWindow::ExportSingleThreadText(DWORD index, LPCWSTR dir)
 {
 	WCHAR entry_string[0x200]; 
-	LPWSTR hook_name;
-	LPWSTR p1, p2;
-	DWORD num, index, len;
+	LPWSTR hook_name, p;
+	LPCWSTR comment;
+	DWORD num, len, len_hook, i;
 	LARGE_INTEGER time;
 	TIME_FIELDS tf;
 	TextThread* it;
@@ -2212,7 +2194,7 @@ void ThreadWindow::ExportSingleThreadText()
 	NtQuerySystemTime(&time);
 	IthSystemTimeToLocalTime(&time);
 	RtlTimeToTimeFields(&time, &tf);
-	index = SendMessage(hcCurrentThread, CB_GETCURSEL, 0, 0);
+	//index = SendMessage(hcCurrentThread, CB_GETCURSEL, 0, 0);
 	len = SendMessage(hcCurrentThread, CB_GETLBTEXTLEN, index, 0);
 	if (len >= 0x200)
 	{
@@ -2221,40 +2203,67 @@ void ThreadWindow::ExportSingleThreadText()
 	}
 	SendMessage(hcCurrentThread, CB_GETLBTEXT, index, (LPARAM)entry_string);
 	swscanf(entry_string, L"%X", &num);
-	p1 = wcsrchr(entry_string,L':');
-	if (p1 == 0) return;
-	p1++;
-	entry_string[len] = L'-';
-	for (p2 = p1; *p2 != L'-'; p2++);
-	*p2 = 0;
-	hook_name = new WCHAR[p2 - p1 + 1];
-	wcscpy(hook_name,p1);
-	man -> LockHookman();
 	it = table -> FindThread(num);
-	tf.wYear = tf.wYear%100;
-	if (it)
+	if (it == 0) return;
+	i = 0;
+	for (p = entry_string; *p; p++)
 	{
-		p1 = entry_string;
-		p1 += swprintf(p1, L"%.2d%.2d%.2d-%.2d%.2d-%.4X-%s",
-			tf.wYear, tf.wMonth, tf.wDay, tf.wHour, tf.wMinute, num, hook_name);
-		if (it->GetComment())
-		{
-			p1 += swprintf(p1,L"-%s",it->GetComment());
-		}
-		if (p1 - entry_string < 0x1F0)
-		{
-			p1[0] = L'.';
-			p1[1] = L't';
-			p1[2] = L'x';
-			p1[3] = L't';
-			p1[4] = 0;
-			it -> ExportTextToFile(entry_string);
-		}
+		if (*p == L':') i++;
+		if (i == 5) break;
+	}
+	if (i < 5) return;
+	p++;
+	comment = it->GetComment();
+	if (comment)
+	{
+		len_hook = entry_string + len - wcslen(comment) - p - 1;
+		p[len_hook] = 0;
+	}
+	else
+	{
+		len_hook = wcslen(p);
+	}
+	hook_name = new WCHAR[len_hook + 1];
+	for (i = 0; i < len_hook; i++)
+	{
+		WCHAR c = hook_name[i];
+		if (c >= 0x80) continue;
+		if (forbidden_table[c >> 3] & (1 << (c & 7))) hook_name[i] = L'_';
+	}
+	wcscpy(hook_name, p);
+	man -> LockHookman();
+	tf.wYear = tf.wYear%100;
 
+	p = entry_string;
+	p += swprintf(p, L"%.2d%.2d%.2d-%.2d%.2d-%.4X-%s",
+		tf.wYear, tf.wMonth, tf.wDay, tf.wHour, tf.wMinute, num, hook_name);
+	delete hook_name;
+	if (comment) p += swprintf(p,L"-%s",comment);
+	if (p - entry_string < 0x1F0)
+	{
+		p[0] = L'.';
+		p[1] = L't';
+		p[2] = L'x';
+		p[3] = L't';
+		p[4] = 0;
+		p += 4;
+		LPWSTR file_path;
+		if (dir)
+		{
+			int len_dir = wcslen(dir);
+			file_path = new WCHAR[p - entry_string + len_dir + 2];
+			memcpy(file_path, dir, len_dir << 1);
+			file_path[len_dir] = L'\\';
+			wcscpy(file_path + len_dir + 1, entry_string);
+			it->ExportTextToFile(file_path);
+			delete file_path;
+		}
+		else it -> ExportTextToFile(entry_string);
 	}
 	man -> UnlockHookman();
+
 	//MessageBox(0, L"Success. Text saved in ITH folder.", L"Success", 0);
-	ShellExecute(0, L"open", L"", 0, 0, SW_SHOWNORMAL);
+	//ShellExecute(0, L"open", L"", 0, 0, SW_SHOWNORMAL);
 }
 
 ProfileWindow::ProfileWindow(HWND hDialog)

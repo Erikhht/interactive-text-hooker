@@ -1229,7 +1229,7 @@ DWORD SaveSingleThread(Profile* pf, TextThread* thread, ProcessRecord* pr)
 		if (i == j) //new thread.
 		{
 			WORD iw = i & 0xFFFF;
-			LPWSTR comment = thread->GetComment();
+			LPCWSTR comment = thread->GetComment();
 			if (comment)
 			{
 				pf->threads[i].comment = new WCHAR[wcslen(comment) + 1];

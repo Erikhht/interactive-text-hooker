@@ -740,10 +740,10 @@ void InsertRUGPHook()
 	LPVOID ch=(LPVOID)0x8140;
 
 	t=SearchPattern(low+0x20000,high-low-0x20000,&ch,4)+0x20000;
-	BYTE* s=(BYTE*)(low+t);
-	if (*(s-2)!=0x81) goto rt;
+	BYTE* s=(BYTE*)(low+t);	
 	if (t!=-1)
 	{
+		if (*(s-2)!=0x81) goto rt;
 		DWORD i = FindEntryAligned((DWORD)s, 0x200);
 		if (i != 0)
 		{
@@ -763,7 +763,9 @@ void InsertRUGPHook()
 		if (t==-1) {OutputConsole(L"Can't find characteristic instruction.");return;}
 		s=(BYTE*)(low+t);
 		for (int i=0;i<0x200;i++,s--)
+		{
 			if (s[0]==0x90)
+			{
 				if (*(DWORD*)(s-3)==0x90909090)
 				{
 					t=low+t-i+1;
@@ -778,6 +780,8 @@ void InsertRUGPHook()
 					//RegisterEngineType(ENGINE_RUGP);
 					return;
 				}
+			}
+		}
 	}
 rt:
 	OutputConsole(L"Unknown rUGP engine.");
@@ -1031,17 +1035,17 @@ void SpecialHookShina(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* split, 
 }
 bool InsertShinaHook()
 {
-	HANDLE hFile=IthCreateFile(L"setup.ini",FILE_READ_DATA,FILE_SHARE_READ,FILE_OPEN);
+	HANDLE hFile=IthCreateFile(L"Rio.ini",FILE_READ_DATA,FILE_SHARE_READ,FILE_OPEN);
 	bool flag = false;
 	if (hFile!=INVALID_HANDLE_VALUE)
 	{
 		IO_STATUS_BLOCK ios;
-		char *buffer,*version,*ptr;
+		char *buffer,*version;//,*ptr;
 		char small_buffer[0x40];
-		WCHAR file[0x40];
-		DWORD ver,i,j;
+		//WCHAR file[0x40];
+		DWORD ver;//,i,j;
 		buffer=text_buffer;
-		NtReadFile(hFile,0,0,0,&ios,buffer,0x1000,0,0);
+		/*NtReadFile(hFile,0,0,0,&ios,buffer,0x1000,0,0);
 		NtClose(hFile);
 		version=strstr(buffer,"椎名里緒");
 		if (version)
@@ -1056,8 +1060,8 @@ bool InsertShinaHook()
 			while (*ptr!=',') ptr++;
 			j=ptr-version;
 			for (i=0;i<j;i++)
-				file[i]=version[i];
-			hFile=IthCreateFile(file,FILE_READ_DATA,FILE_SHARE_READ,FILE_OPEN);
+				file[i]=version[i];*/
+			//hFile=IthCreateFile(L"Rio.ini",FILE_READ_DATA,FILE_SHARE_READ,FILE_OPEN);
 			NtReadFile(hFile,0,0,0,&ios,small_buffer,0x40,0,0);
 			NtClose(hFile);
 			small_buffer[0x3F]=0;
@@ -1091,7 +1095,7 @@ bool InsertShinaHook()
 						//RegisterEngineType(ENGINE_SHINA);
 					}
 				}
-			}
+			//}
 		}
 		else
 		{

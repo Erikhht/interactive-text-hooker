@@ -79,7 +79,7 @@ public:
 	void SetThread();
 	void SetLastSentence(DWORD select);
 	void ExportAllThreadText();
-	void ExportSingleThreadText();
+	void ExportSingleThreadText(DWORD index, LPCWSTR dir);
 private:
 	HWND hDlg;
 	HWND hcCurrentThread,hcLinkThread;

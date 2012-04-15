@@ -100,7 +100,7 @@ public:
 	inline void SetRepeatFlag() {status|=CYCLIC_REPEAT;}
 	inline void ClearNewLineFlag() {status&=~BUFF_NEWLINE;}
 	inline void ClearRepeatFlag() {status&=~CYCLIC_REPEAT;}
-	inline LPWSTR GetComment() {return comment;}
+	inline LPCWSTR GetComment() {return comment;}
 private:
 	ThreadParameter tp;
 	
