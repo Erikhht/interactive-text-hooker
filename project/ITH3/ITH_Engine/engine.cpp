@@ -2722,11 +2722,24 @@ _fin:
 void InsertAnex86Hook()
 {
 	HookParam hp = {};
-	hp.addr = 0x440890;
-	hp.extern_fun = (DWORD)SpecialHookAnex86;
-	hp.type = EXTERN_HOOK;
-	hp.length_offset = 1;
-	NewHook(hp, L"Anex86");
+	static DWORD inst[2] = {0x618AC033,0x0D418A0C};
+	DWORD i;
+	for (i = module_base + 0x1000; i < module_limit - 8; i++)
+	{
+		if (*(DWORD*)i == inst[0])
+		{
+			if (*(DWORD*)(i + 4) == inst[1])
+			{
+				hp.addr = i;
+				hp.extern_fun = (DWORD)SpecialHookAnex86;
+				hp.type = EXTERN_HOOK;
+				hp.length_offset = 1;
+				NewHook(hp, L"Anex86");
+				return;
+			}
+		}
+	}
+	OutputConsole(L"Unknown Anex86 engine.");
 }
 
 DWORD InsertDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
@@ -3146,7 +3159,7 @@ DWORD DetermineNoHookEngine()
 }
 DWORD DetermineEngineType()
 {
-	OutputConsole(L"Engine support module 2012.4.8");
+	OutputConsole(L"Engine support module 2012.4.20");
 	if (DetermineEngineByFile1()==0) return 0;
 	if (DetermineEngineByFile2()==0) return 0;
 	if (DetermineEngineByFile3()==0) return 0;
