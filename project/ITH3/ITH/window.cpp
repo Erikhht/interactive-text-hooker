@@ -826,7 +826,7 @@ void LoadBMP(HWND hWnd)
 	}
 	ReleaseDC(hwndEdit, hDC);
 }
-DWORD ThreadOutput(TextThread* thread, BYTE* out,DWORD len, DWORD new_line, PVOID data)
+DWORD ThreadFilter(TextThread* thread, BYTE* out,DWORD len, DWORD new_line, PVOID data)
 {
 	DWORD status = thread->Status();
 
@@ -857,8 +857,9 @@ DWORD ThreadOutput(TextThread* thread, BYTE* out,DWORD len, DWORD new_line, PVOI
 				{
 					if (!mb_filter->Check(c)) out[j++] = c & 0xFF;
 				}
-				else
+				else if (i + 1 < len)
 				{
+
 					c = out[i + 1];
 					c <<= 8;
 					c |= out[i];
@@ -874,6 +875,12 @@ DWORD ThreadOutput(TextThread* thread, BYTE* out,DWORD len, DWORD new_line, PVOI
 			len = j;
 		}
 	}
+	return len;
+}
+DWORD ThreadOutput(TextThread* thread, BYTE* out,DWORD len, DWORD new_line, PVOID data)
+{
+	DWORD status = thread->Status();
+
 	if (status & CURRENT_SELECT)
 	{
 		if (new_line)
@@ -972,7 +979,8 @@ DWORD ThreadReset(TextThread* thread)
 }
 DWORD ThreadCreate(TextThread* thread)
 {
-	thread->RegisterCallBack(ThreadOutput,0);
+	thread->RegisterOutputCallBack(ThreadOutput,0);
+	thread->RegisterFilterCallBack(ThreadFilter,0);
 	AddToCombo(thread);
 	DWORD i,j,k,t1,t2;
 	ThreadParameter* tp = thread->GetThreadParameter();
@@ -1155,7 +1163,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				man->RegisterThreadResetCallback(ThreadReset);
 
 				TextThread* console = man->FindSingle(0);			
-				console->RegisterCallBack(ThreadOutput,0);
+				console->RegisterOutputCallBack(ThreadOutput,0);
 				AddToCombo(console);
 
 				man->RegisterProcessAttachCallback(RegisterProcessList);

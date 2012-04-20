@@ -75,7 +75,8 @@ TextThread::TextThread(DWORD id, DWORD hook, DWORD retn, DWORD spl, WORD num) : 
 	head->count=head->repeat=0;
 	link_number=-1;	
 	repeat_detect_limit=0x80;
-	callback = 0;
+	filter = 0;
+	output = 0;
 }
 TextThread::~TextThread()
 {
@@ -400,13 +401,14 @@ void TextThread::ResetRepeatStatus()
 }
 void TextThread::AddLineBreak()
 {
+	if (sentence_length == 0) return;
 	if (status&BUFF_NEWLINE)
 	{
 		prev_sentence=last_sentence;
 		sentence_length=0;
 		if (status&USING_UNICODE) AddToStore((BYTE*)L"\r\n\r\n",8);
 		else AddToStore((BYTE*)"\r\n\r\n",4);
-		if (callback) callback(this,0,8,TRUE,app_data);
+		if (output) output(this,0,8,TRUE,app_data);
 		last_sentence=used;
 		status&=~BUFF_NEWLINE;
 	}
@@ -434,7 +436,10 @@ void TextThread::AddText(BYTE* con,int len, bool new_line,bool console)
 		}
 	}
 	if (len<=0) return;
-	if (status&BUFF_NEWLINE) AddLineBreak();
+
+	if (filter) len = filter(this,con,len, new_line,app_data);
+	if (len <= 0) return;
+
 	if (sentence_length == 0)
 	{
 		if (status & USING_UNICODE)
@@ -455,6 +460,9 @@ void TextThread::AddText(BYTE* con,int len, bool new_line,bool console)
 		}
 	}
 	if (len <= 0) return;
+
+	if (status&BUFF_NEWLINE) AddLineBreak();
+
 	if (new_line)
 	{
 		prev_sentence=last_sentence;
@@ -492,17 +500,19 @@ void TextThread::AddText(BYTE* con,int len, bool new_line,bool console)
 		}
 		sentence_length+=len;
 	}
-
-	if (callback) len = callback(this,con,len, new_line,app_data);
+	
+	if (output) len = output(this,con,len, new_line,app_data);
 	if (AddToStore(con,len))
 	{
-		ResetRepeatStatus();
+		//sentence_length += len;
+		/*ResetRepeatStatus();
 		last_sentence=0;
 		prev_sentence=0;
 		sentence_length=len;
 		repeat_index=0;
-		status&=~REPEAT_DETECT|REPEAT_SUPPRESS;		
+		status&=~REPEAT_DETECT|REPEAT_SUPPRESS;		*/
 	}
+
 }
 void TextThread::AddTextDirect(BYTE* con, int len) //Add to store directly, penetrating repetition filters.
 {
@@ -534,7 +544,7 @@ void TextThread::AddTextDirect(BYTE* con, int len) //Add to store directly, pene
 		if (send!=con) delete send;
 	}
 	sentence_length+=len;
-	if (callback) len = callback(this,con,len,false,app_data);
+	if (output) len = output(this,con,len,false,app_data);
 	AddToStore(con,len);
 }
 DWORD TextThread::GetEntryString(LPWSTR str, DWORD max)

@@ -92,10 +92,15 @@ public:
 	inline UINT_PTR& Timer() {return timer;}
 	inline ThreadParameter* GetThreadParameter() {return &tp;}
 	inline TextThread*& Link() {return link;}
-	inline 	ThreadOutputFilterCallback RegisterCallBack(ThreadOutputFilterCallback cb, PVOID data)
+	inline 	ThreadOutputFilterCallback RegisterOutputCallBack(ThreadOutputFilterCallback cb, PVOID data)
 	{
 		app_data = data;
-		return (ThreadOutputFilterCallback)_InterlockedExchange((long*)&callback,(long)cb);
+		return (ThreadOutputFilterCallback)_InterlockedExchange((long*)&output,(long)cb);
+	}
+	inline 	ThreadOutputFilterCallback RegisterFilterCallBack(ThreadOutputFilterCallback cb, PVOID data)
+	{
+		app_data = data;
+		return (ThreadOutputFilterCallback)_InterlockedExchange((long*)&filter,(long)cb);
 	}
 	inline void SetRepeatFlag() {status|=CYCLIC_REPEAT;}
 	inline void ClearNewLineFlag() {status&=~BUFF_NEWLINE;}
@@ -113,7 +118,7 @@ private:
 	RepeatCountNode* head;
 
 	TextThread *link;
-	ThreadOutputFilterCallback callback;
+	ThreadOutputFilterCallback filter,output;
 	PVOID app_data;
 	LPWSTR comment,thread_string;
 	UINT_PTR timer;
