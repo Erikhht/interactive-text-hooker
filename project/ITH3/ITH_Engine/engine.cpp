@@ -1228,24 +1228,28 @@ void InsertTinkerBellHook()
 	{
 		if (*(DWORD*)i == 0x8141)
 		{
-			if (*(BYTE*)(i-1) == 0x2D) 
+			BYTE t = *(BYTE*)(i - 1);
+			if (t == 0x3D || t == 0x2D) 
 			{
 				hp.off = -0x8;
 				hp.addr = i - 1;
 			}
-			else if (*(BYTE*)(i-2) == 0x81 &&
-				(*(BYTE*)(i-1) & 0xF8) == 0xE8)
+			else if (*(BYTE*)(i-2) == 0x81)
 			{
-				hp.off = -8 - ((*(BYTE*)(i-1) & 7) << 2);
-				hp.addr = i - 2;
+				t &= 0xF8;
+				if (t == 0xF8 || t == 0xE8)
+				{
+					hp.off = -8 - ((*(BYTE*)(i-1) & 7) << 2);
+					hp.addr = i - 2;
+				}
 			}
 			if (hp.addr)
 			{
-				if (count)
-				{
-					NewHook(hp, L"TinkerBell");
-					break;
-				}
+				WCHAR hook_name[0x20];
+				memcpy(hook_name, L"TinkerBell", 0x14);
+				hook_name[0xA] = L'0' + count;
+				hook_name[0xB] = 0;
+				NewHook(hp, hook_name);
 				count++;
 				hp.addr = 0;
 			}
@@ -2652,7 +2656,6 @@ static BYTE JIS_tableL[0x80] = {
 
 void SpecialHookAnex86(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* split, DWORD* len)
 {
-	//__asm int 3
 	__asm
 	{
 		mov eax, esp_base
@@ -2686,37 +2689,6 @@ _jis_char:
 		mov [ecx], 2
 _fin:
 	}
-	/*BYTE* ecx = *(BYTE**)(esp_base - 0xC);
-	BYTE flag = ecx[0xE];
-	if (flag != 0)
-	{
-		*len = 0;
-		return;
-	}
-	BYTE lb,hb,t;
-	DWORD jis = *(WORD*)(ecx+0xC);
-	if ((jis & 0xFF) == 0)
-	{
-		*data = jis >> 8;
-		*len = 1;
-	}
-	else
-	{
-		*data = _byteswap_ushort(_mbcjistojms(jis + 0x2000));
-		*len = 2;
-	}
-	
-	lb = ecx[0xC];
-	hb = ecx[0xD];
-	lb += 0x20;
-	if ((hb & 1) == 0) lb += 0x5E;
-	if (lb < 0x80) lb--;
-	t = (hb - 1) >> 1;
-	if (hb < 0x3E) hb = t + 0x81;
-	else hb = t + 0xC1;
-	*data = lb;
-	*data <<= 8;
-	*data |= hb;*/
 	
 }
 void InsertAnex86Hook()
