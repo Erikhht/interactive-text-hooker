@@ -271,7 +271,7 @@ DWORD EncodePercent(const char* toEncode, int len, char* out)
 	}
 	return out - start;
 }
-DWORD SyncFile(HANDLE hFile, char* link, char* last_modified)
+DWORD SyncFile(HANDLE hFile, char* link)
 {
 	int len = strlen(link), i, j, k;
 	if (len > 0x380) return -1;
@@ -387,41 +387,13 @@ DWORD SyncFile(HANDLE hFile, char* link, char* last_modified)
 }
 DWORD SyncFile(LPWSTR file, HANDLE hDir, char* base_link, bool forceUpdate)
 {
-	HANDLE hFile = IthCreateFileInDirectory(file, hDir, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, FILE_OPEN);
-	char last_modified[0x40], *url, *ptr, *file_utf8;
-	last_modified[0] = '*';
-	last_modified[1] = 0;
-	IO_STATUS_BLOCK ios;
-	STATUS_INFO_LENGTH_MISMATCH;
-	if (hFile != INVALID_HANDLE_VALUE)
+	HANDLE hFile = IthCreateFileInDirectory(file, hDir, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, FILE_OPEN_IF);	
+	if (hFile == INVALID_HANDLE_VALUE)
 	{
-		if (!forceUpdate)
-		{
-			static const char* weekday[7] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-			static const char* month[13] = {"", "Jan", "Feb", "Mar", "Apr", "May", "Jun", 
-				"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-			FILE_BASIC_INFORMATION info;
-			NtQueryInformationFile(hFile, &ios, &info, sizeof(info), FileBasicInformation);
-			TIME_FIELDS tf;
-			RtlTimeToTimeFields(&info.LastWriteTime, &tf);
-			ptr = last_modified;
-			memcpy(ptr, weekday[tf.wWeekday], 4); //3
-			ptr[3] = ','; //4
-			ptr[4] = ' '; //5
-			ptr += 5;
-			ptr += sprintf(ptr, "%d ", tf.wDay); //8
-			if (tf.wMonth == 0) __asm int 3
-				memcpy(ptr, month[tf.wMonth], 4);  //11
-			ptr[3] = ' '; //12
-			ptr += 4;
-			sprintf(ptr, "%.4d %.2d:%.2d:%.2d GMT", tf.wYear, tf.wHour, tf.wMinute, tf.wSecond); //29
-		}
+		MessageBox(0,L"Failed to create file.",file,0);
+		return -1;
 	}
-	else
-	{
-		hFile = IthCreateFileInDirectory(file, hDir, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, FILE_OPEN_IF);
-		if (hFile == INVALID_HANDLE_VALUE) return -1;
-	}
+	char *url, *ptr, *file_utf8;
 	int base_len, file_len;
 	base_len = strlen(base_link);
 	file_len = UTF16to8Len(file);
@@ -432,7 +404,7 @@ DWORD SyncFile(LPWSTR file, HANDLE hDir, char* base_link, bool forceUpdate)
 	if (url[base_len - 1] != '/') url[base_len++] = '/';
 	ptr = url + base_len;
 	ptr[EncodePercent(file_utf8, file_len, ptr)] = 0;
-	DWORD result = SyncFile(hFile, url, last_modified);
+	DWORD result = SyncFile(hFile, url);
 	if (result == -1)
 	if (secure_sock)
 	{
@@ -442,7 +414,7 @@ DWORD SyncFile(LPWSTR file, HANDLE hDir, char* base_link, bool forceUpdate)
 			ITH_TLS_DestroySocket(sock);
 			sock = ITH_TLS_NewSocket(false);
 			sock->socket();
-			result = SyncFile(hFile, url, last_modified);
+			result = SyncFile(hFile, url);
 		}
 	}
 	NtClose(hFile);

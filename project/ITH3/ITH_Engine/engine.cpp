@@ -2362,8 +2362,15 @@ MEMORY_WORKING_SET_LIST* GetWorkingSet()
 		if (!NT_SUCCESS(status)) return 0;
 		status = NtQueryVirtualMemory(NtCurrentProcess(), 0, MemoryWorkingSetList, buffer, len, &retl);
 		if (!NT_SUCCESS(status)) return 0;
+		return (MEMORY_WORKING_SET_LIST*)buffer;
 	}
-	return (MEMORY_WORKING_SET_LIST*)buffer;
+	else
+	{
+		retl = 0;
+		NtFreeVirtualMemory(NtCurrentProcess(), &buffer, &retl, MEM_RELEASE);
+		return 0;
+	}
+	
 }
 typedef struct _NSTRING
 {
@@ -2534,31 +2541,6 @@ void InsertTanukiHook()
 	}
 	OutputConsole(L"Unknown TanukiSoft engine.");
 }
-DWORD FindNextCall(DWORD start, DWORD range, DWORD base, DWORD limit, DWORD* fun)
-{
-	DWORD j, k;
-	union
-	{
-		DWORD i;
-		DWORD* id;
-		BYTE* ib;
-	};
-	j = start + range;
-	for (i = start; i < j; i++)
-	{
-		if (*ib == 0xE8)
-		{
-			i++;
-			k = i + 4 + *id;
-			if (k > base && k < limit)
-			{
-				if (fun) *fun = k;
-				return i + 4;
-			}
-		}
-	}
-	return 0;
-}
 void SpecialHookRyokucha(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* split, DWORD* len)
 {
 	DWORD *base = (DWORD*)esp_base;
@@ -2587,7 +2569,7 @@ bool InsertRyokuchaDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 	{
 		mov eax,fs:[0]
 		mov eax,[eax]
-		mov eax,[eax] //Step up upon SEH chain for 2 nodes.
+		mov eax,[eax] //Step up SEH chain for 2 nodes.
 		mov ecx,[eax + 0xC]
 		mov eax,[eax + 4]
 		add ecx,[ecx - 4]
@@ -2614,7 +2596,6 @@ void InsertRyokuchaHook()
 	trigger_fun = InsertRyokuchaDynamicHook;
 	SwitchTrigger(true);
 }
-extern "C" __declspec(dllimport) unsigned int _mbcjistojms(unsigned int c);
 
 static BYTE JIS_tableH[0x80] = {
 	0x00,0x81,0x81,0x82,0x82,0x83,0x83,0x84,
@@ -2672,10 +2653,9 @@ void SpecialHookAnex86(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* split,
 		mov [eax], 1
 		jmp _fin
 _jis_char:
-		mov eax,0x7E
-		cmp ebx,eax
+		cmp ebx,0x7E
 		ja _fin
-		cmp edx,eax
+		cmp edx,0x7E
 		ja _fin
 		test dl,1
 		lea eax, [ebx + 0x7E]
