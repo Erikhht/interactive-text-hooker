@@ -2596,7 +2596,63 @@ void InsertRyokuchaHook()
 	trigger_fun = InsertRyokuchaDynamicHook;
 	SwitchTrigger(true);
 }
-
+void InsertGXPHook()
+{
+	DWORD j, k;
+	bool flag;
+	union
+	{
+		DWORD i;
+		DWORD* id;
+		BYTE* ib;
+	};
+	//__asm int 3
+	for (i = module_base + 0x1000; i < module_limit - 4; i++)
+	{
+		//find cmp word ptr [esi*2+eax],0
+		if (*id != 0x703c8366) continue;
+		i += 4;
+		if (*ib != 0) continue;
+		i++;
+		j = i + 0x200;
+		j = j < (module_limit - 8) ? j : (module_limit - 8); 
+		
+		while (i < j)
+		{
+			k = disasm(ib);
+			if (k == 0) break;
+			if (k == 1 && (*ib & 0xF8) == 0x50) //push reg
+			{
+				flag = true;
+				break;
+			}
+			i += k;
+		}
+		if (flag)
+		{
+			while (i < j)
+			{
+				if (*ib == 0xE8)
+				{
+					i++;
+					k = *id + i + 4;
+					if (k > module_base && k < module_limit)
+					{
+						HookParam hp = {};
+						hp.addr = k;
+						hp.type = USING_UNICODE | DATA_INDIRECT;
+						hp.length_offset = 1;
+						hp.off = 4;
+						NewHook(hp, L"GXP");
+						return;
+					}
+				}
+				i++;
+			}
+		}
+	}
+	OutputConsole(L"Unknown GXP engine.");
+}
 static BYTE JIS_tableH[0x80] = {
 	0x00,0x81,0x81,0x82,0x82,0x83,0x83,0x84,
 	0x84,0x85,0x85,0x86,0x86,0x87,0x87,0x88,
@@ -2937,6 +2993,11 @@ DWORD DetermineEngineByFile4()
 	{
 		//IthBreak();
 		InsertTanukiHook();
+		return 0;
+	}
+	if (IthFindFile(L"*.gxp"))
+	{
+		InsertGXPHook();
 		return 0;
 	}
 	return 1;
