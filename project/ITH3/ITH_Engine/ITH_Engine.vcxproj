@@ -88,6 +88,9 @@
       <EntryPointSymbol>DllMain</EntryPointSymbol>
       <DataExecutionPrevention>false</DataExecutionPrevention>
     </Link>
+    <PreBuildEvent>
+      <Command>$(SolutionDir)BuildDate $(SolutionDir)</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="engine.cpp" />

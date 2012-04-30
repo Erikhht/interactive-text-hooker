@@ -711,7 +711,19 @@ BOOL IthGetFileInfo(LPWSTR file, LPVOID info, DWORD size)
 	NTSTATUS status;
 	HANDLE h;
 	UNICODE_STRING us;
-	RtlInitUnicodeString(&us,file);
+	LPWSTR path = wcsrchr(file, L'\\');
+	us.Buffer = file;
+	if (path)
+	{
+		us.Length = (path - file) << 1;
+		us.MaximumLength = us.Length;
+	}
+	else
+	{
+		us.Length = 0;
+		us.MaximumLength = 0;
+	}
+	//RtlInitUnicodeString(&us,file);
 	OBJECT_ATTRIBUTES oa={sizeof(oa),dir_obj,&us,OBJ_CASE_INSENSITIVE,0,0};
 	IO_STATUS_BLOCK ios;
 	if (NT_SUCCESS(NtOpenFile(&h,FILE_LIST_DIRECTORY|SYNCHRONIZE,

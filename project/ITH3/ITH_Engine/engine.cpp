@@ -19,6 +19,7 @@
 #include <ITH\IHF_DLL.h>
 #include <ITH\IHF_SYS.h>
 #include <ITH\ntdll.h>
+#include <ITH\version.h>
 WCHAR process_name[MAX_PATH];
 //HANDLE hEngineOn;
 struct CodeSection
@@ -2749,7 +2750,79 @@ void InsertAnex86Hook()
 	}
 	OutputConsole(L"Unknown Anex86 engine.");
 }
-
+static char* ShinyDaysStackString[0x10];
+static int ShinyDaysStackStringLen[0x10];
+static int ShinyDaysStackIndex;
+void SpecialHookShinyDays(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* split, DWORD* len)
+{
+	LPWSTR fun_str;
+	char *buffer_str, *text_str;
+	DWORD l = 0;
+	__asm
+	{
+		mov eax,esp_base
+		mov ecx,[eax+0x4C]
+		mov fun_str,ecx
+		mov esi,[eax+0x70]
+		mov edi,[eax+0x74]
+		add esi,0x3C
+		cmp esi,edi
+		jae _no_text
+		mov edx,[esi+0x10]
+		mov ecx,esi
+		cmp edx,8
+		cmovae ecx,[ecx]
+		add edx,edx
+		mov text_str,ecx
+		mov l,edx
+_no_text:
+	}
+	if (memcmp(fun_str,L"[PlayVoice]",0x18) == 0)
+	{
+		if (ShinyDaysStackIndex > 0)
+		{
+			ShinyDaysStackIndex--;
+			buffer_str = ShinyDaysStackString[ShinyDaysStackIndex];
+			ShinyDaysStackString[ShinyDaysStackIndex] = 0;
+			l = ShinyDaysStackStringLen[ShinyDaysStackIndex];
+			memcpy(text_buffer, buffer_str, l);
+			*data = (DWORD)text_buffer;
+			*len = l;
+			delete buffer_str;
+		}
+		return;
+	}
+	if (memcmp(fun_str,L"[PrintText]",0x18) == 0)
+	{
+		if (l && ShinyDaysStackIndex < 0x10)
+		{
+			buffer_str = new char[l];
+			memcpy(buffer_str, text_str, l);
+			ShinyDaysStackString[ShinyDaysStackIndex] = buffer_str;
+			ShinyDaysStackStringLen[ShinyDaysStackIndex] = l;
+			ShinyDaysStackIndex++;
+		}
+	}
+}
+void InsertShinyDaysHook()
+{
+	static const BYTE ins[0x10] = {
+		0xFF,0x83,0x70,0x03,0x00,0x00,0x33,0xF6,
+		0xC6,0x84,0x24,0x90,0x02,0x00,0x00,0x02
+	};
+	LPVOID addr = (LPVOID)0x42ad94;
+	if (memcmp(addr, ins, 0x10) != 0)
+	{
+		OutputConsole(L"Only work for 1.00");
+		return;
+	}
+	HookParam hp = {};
+	hp.addr = 0x42ad9c;
+	hp.extern_fun = (DWORD)SpecialHookShinyDays;
+	hp.type = USING_UNICODE | USING_STRING| EXTERN_HOOK | NO_CONTEXT;
+	NewHook(hp, L"ShinyDays 1.00");
+	return;
+}
 DWORD InsertDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 {
 	return !trigger_fun(addr,frame,stack);
@@ -3037,6 +3110,11 @@ DWORD DetermineEngineByProcessName()
 		InsertAnex86Hook();
 		return 0;
 	}
+	if (wcsstr(str,L"shinydays"))
+	{
+		InsertShinyDaysHook();
+		return 0;
+	}
 	DWORD len = wcslen(str);
 	str[len - 3] = L'b';
 	str[len - 2] = L'i';
@@ -3085,6 +3163,7 @@ DWORD DetermineEngineOther()
 	{	
 		if (*(DWORD*)static_file_info==0)
 		{
+			STATUS_INFO_LENGTH_MISMATCH;
 			static WCHAR static_search_name[MAX_PATH];	
 			LPWSTR name=(LPWSTR)(static_file_info+0x5E);		
 			int len=wcslen(name);		
@@ -3172,7 +3251,9 @@ DWORD DetermineNoHookEngine()
 }
 DWORD DetermineEngineType()
 {
-	OutputConsole(L"Engine support module 2012.4.20");
+	WCHAR engine_info[0x100];
+	swprintf(engine_info, L"Engine support module %s", build_date);
+	OutputConsole(engine_info);
 	if (DetermineEngineByFile1()==0) return 0;
 	if (DetermineEngineByFile2()==0) return 0;
 	if (DetermineEngineByFile3()==0) return 0;

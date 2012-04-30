@@ -1170,8 +1170,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				man->RegisterProcessDetachCallback(RemoveProcessList);
 				man->RegisterProcessNewHookCallback(RefreshProfileOnNewHook);
 				IHF_Start();
-				man->AddConsoleOutput(version);
-				man->AddConsoleOutput(InitMessage);
+				{
+					static WCHAR version_info[0x100];
+					static const WCHAR program_name[] = L"Interactive Text Hooker";
+					static const WCHAR program_version[] = L"3.0";
+					swprintf(version_info, L"%s %s (%s)", program_name, program_version, build_date);
+					man->AddConsoleOutput(version_info);
+					man->AddConsoleOutput(InitMessage);
+				}
+
 				if (background == 0) man->AddConsoleOutput(BackgroundMsg);
 			}
 
