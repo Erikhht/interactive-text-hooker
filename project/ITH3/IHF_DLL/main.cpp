@@ -202,7 +202,7 @@ DWORD IHFAPI NewHook(const HookParam& hp, LPWSTR name, DWORD flag)
 				swprintf(name,L"UserHook%d",user_hook_count++);
 			}
 		}
-		hookman[current].InitHook(hp,name,flag);
+		hookman[current].InitHook(hp,name,flag & 0xFFFF);
 		if (hookman[current].InsertHook()==0)
 		{
 			OutputConsole(L"Additional hook inserted.");

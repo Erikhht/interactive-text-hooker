@@ -17,40 +17,9 @@
 
 #pragma once
 #include <windows.h>
-//#include <ITH\ntdll.h>
 #include <ITH\string.h>
 #include <ITH\mem.h>
-/*#define ENGINE_KIRIKIRI 1
-#define ENGINE_BGI 2
-#define ENGINE_REALLIVE 3
-#define ENGINE_MAJIRO 4
-#define ENGINE_CMVS 5
-#define ENGINE_RUGP 6
-#define ENGINE_LUCIFEN 7
-#define ENGINE_SYS40 8
-#define ENGINE_ATELIER 9
-#define ENGINE_CIRCUS 10
-#define ENGINE_SHINA 11
-#define ENGINE_LUNE 12
-#define ENGINE_TINKER 13
-#define ENGINE_WHIRLPOOL 14
-#define ENGINE_COTOPHA 15
-#define ENGINE_MALIE 16
-#define ENGINE_SOFTHOUSE 17
-#define ENGINE_CATSYSTEM 18
-#define ENGINE_IGS 19
-#define ENGINE_WAFFLE 20
-#define ENGINE_NITROPLUS 21
-#define ENGINE_AB2TRY 22
-#define ENGINE_RETOUCH 23
-#define ENGINE_SIGLUS 24
-#define ENGINE_ABEL 25
-#define ENGINE_LIVE 26
-#define ENGINE_FRONTWING 27
-#define ENGINE_BRUNS 28
-#define ENGINE_CANDY 29
-#define ENGINE_APRICOT 30
-#define ENGINE_CARAMEL 31*/
+
 #define IHF_COMMAND -1
 #define IHF_COMMAND_NEW_HOOK 0
 #define IHF_COMMAND_REMOVE_HOOK 1
@@ -78,12 +47,17 @@
 
 #define MAX_HOOK 32
 
+
+
 struct HookParam //0x24
 {
+	typedef void (*DataFun)(DWORD, HookParam*, DWORD*, DWORD*, DWORD*);
+
 	DWORD addr;
 	DWORD off,ind,split,split_ind;
 	DWORD module,function;
-	DWORD extern_fun,type;
+	DataFun extern_fun;
+	DWORD type;
 	WORD length_offset;
 	BYTE hook_len,recover_len;
 };

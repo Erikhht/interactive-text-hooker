@@ -99,7 +99,7 @@ termin:
 	}
 }*/
 
-typedef void (*DataFun)(DWORD, const HookParam&, DWORD*, DWORD*, DWORD*);
+typedef void (*DataFun)(DWORD, const HookParam*, DWORD*, DWORD*, DWORD*);
 static DWORD recv_esp, recv_addr;
 static EXCEPTION_DISPOSITION ExceptHandler(EXCEPTION_RECORD *ExceptionRecord,
 	void * EstablisherFrame, CONTEXT *ContextRecord, void * DispatcherContext )
@@ -200,7 +200,7 @@ DWORD TextHook::Send(DWORD dwDataBase, DWORD dwRetn)
 	if (dwType&EXTERN_HOOK) 
 	{
 		DataFun fun=(DataFun)hp.extern_fun;
-		fun(dwDataBase,hp,&dwDataIn,&dwSplit,&dwCount);
+		fun(dwDataBase,&hp,&dwDataIn,&dwSplit,&dwCount);
 		if (dwCount==0 || dwCount > 0x10000) return 0;
 	}
 	else

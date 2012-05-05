@@ -615,7 +615,7 @@ void InsertSiglusHook()
 		{
 			HookParam hp={};
 			hp.addr=base;
-			hp.extern_fun=(DWORD)SpecialHookSiglus;
+			hp.extern_fun=SpecialHookSiglus;
 			hp.type=EXTERN_HOOK|USING_UNICODE;
 			NewHook(hp,L"SiglusEngine");
 			//RegisterEngineType(ENGINE_SIGLUS);
@@ -674,7 +674,7 @@ void InsertMajiroHook()
 	hp.type|=USING_STRING|USING_SPLIT|SPLIT_INDIRECT;*/
 	hp.addr=FindCallAndEntryAbs((DWORD)TextOutA,module_limit-module_base,module_base,0xEC81);
 	hp.type=EXTERN_HOOK;
-	hp.extern_fun=(DWORD)SpecialHookMajiro;
+	hp.extern_fun=SpecialHookMajiro;
 	NewHook(hp,L"MAJIRO");
 	//RegisterEngineType(ENGINE_MAJIRO);
 }
@@ -752,7 +752,7 @@ void InsertRUGPHook()
 			hp.addr=i;
 			//hp.off= -8;
 			hp.length_offset=1;
-			hp.extern_fun=(DWORD)SpecialHookRUGP;
+			hp.extern_fun=SpecialHookRUGP;
 			hp.type|=BIG_ENDIAN|EXTERN_HOOK;
 			NewHook(hp,L"rUGP");
 			return;
@@ -956,6 +956,7 @@ void InsertCircusHook2()
 {
 	DWORD i,j;
 	for (i=module_base+0x1000;i<module_limit-4;i++)
+	{
 		if ((*(DWORD*)i&0xFFFFFF)==0x75243C) // cmp al, 24; je
 		{
 			j = FindEntryAligned(i,0x80);
@@ -971,7 +972,8 @@ void InsertCircusHook2()
 			}
 			break;
 		}
-		OutputConsole(L"Unknown CIRCUS engine");
+	}
+	OutputConsole(L"Unknown CIRCUS engine.");
 }
 /********************************************************************************************
 ShinaRio hook:
@@ -1075,7 +1077,7 @@ bool InsertShinaHook()
 				if (ver>=48)
 				{
 					hp.addr=(DWORD)GetTextExtentPoint32A;
-					hp.extern_fun=(DWORD)SpecialHookShina;
+					hp.extern_fun=SpecialHookShina;
 					hp.type=EXTERN_HOOK|USING_STRING;
 					NewHook(hp,L"ShinaRio");
 					//RegisterEngineType(ENGINE_SHINA);
@@ -1220,7 +1222,8 @@ void InsertTinkerBellHook()
 {
 	//DWORD s1,s2,i;
 	//DWORD ch=0x8141;
-	DWORD i,count;
+	DWORD i;
+	WORD count;
 	count = 0;
 	HookParam hp = {};
 	hp.length_offset = 1;
@@ -1497,7 +1500,7 @@ void InsertRREHook()
 		hp.type=NO_CONTEXT|DATA_INDIRECT;
 		if ((*(WORD*)(c-2)!=sig)) 
 		{
-			hp.extern_fun=(DWORD)SpecialRunrunEngine;
+			hp.extern_fun=SpecialRunrunEngine;
 			hp.type|=EXTERN_HOOK;
 			NewHook(hp,L"RunrunEngine Old");
 		} 
@@ -1580,7 +1583,7 @@ _again:
 		hp.addr=(DWORD)ptr+4;
 		hp.off=-8;
 		hp.length_offset=1;
-		hp.extern_fun=(DWORD)SpecialHookMalie;
+		hp.extern_fun=SpecialHookMalie;
 		hp.type=EXTERN_HOOK|USING_SPLIT|USING_UNICODE|NO_CONTEXT;
 		NewHook(hp,L"Malie");
 		//RegisterEngineType(ENGINE_MALIE);
@@ -1918,7 +1921,7 @@ void InsertApricotHook()
 				{
 					HookParam hp={};
 					hp.addr=j+3;
-					hp.extern_fun=(DWORD)SpecialHookApricot;
+					hp.extern_fun=SpecialHookApricot;
 					hp.type=EXTERN_HOOK|USING_STRING|USING_UNICODE|NO_CONTEXT;
 					NewHook(hp,L"ApRicot");
 					//RegisterEngineType(ENGINE_APRICOT);
@@ -2069,7 +2072,7 @@ void InsertDebonosuHook()
 			if (*(DWORD*)(j + 1) != push) continue;
 			HookParam hp = {};
 			hp.addr = FindEntryAligned(i, 0x200);
-			hp.extern_fun = (DWORD)SpecialHookDebonosu;
+			hp.extern_fun = SpecialHookDebonosu;
 			if (hp.addr == 0) continue;
 			hp.type = USING_STRING | EXTERN_HOOK;
 			NewHook(hp, L"Debonosu");
@@ -2134,7 +2137,7 @@ bool InsertSofthouseDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 			{				
 				HookParam hp={};
 				hp.off=0x4;
-				hp.extern_fun=(DWORD)SpecialHookSofthouse;
+				hp.extern_fun=SpecialHookSofthouse;
 				hp.type=USING_STRING|EXTERN_HOOK;
 				if (addr==DrawTextExW) {hp.type|=USING_UNICODE;}
 				i=*(DWORD*)(k-4);
@@ -2229,7 +2232,7 @@ void InsertCaramelBoxHook()
 				{
 					HookParam hp = {};
 					hp.addr = j & ~0xF;
-					hp.extern_fun = (DWORD)SpecialHookCaramelBox;
+					hp.extern_fun = SpecialHookCaramelBox;
 					hp.type = USING_STRING | EXTERN_HOOK;
 					for (i &= ~0xFFFF; i < module_limit - 4; i++)
 					{
@@ -2424,7 +2427,7 @@ BOOL FindCharacteristInstruction(MEMORY_WORKING_SET_LIST* list)
 							{
 								HookParam hp = {};
 								hp.addr = j;
-								hp.extern_fun = (DWORD)SpecialHookAB2Try;
+								hp.extern_fun = SpecialHookAB2Try;
 								hp.type = USING_STRING | USING_UNICODE| EXTERN_HOOK | NO_CONTEXT;
 								NewHook(hp,L"AB2Try");
 								OutputConsole(L"Please adjust text speed to fastest/immediate.");
@@ -2516,7 +2519,7 @@ void InsertWillPlusHook()
 		OutputConsole(L"Unknown WillPlus engine.");
 		return;
 	}
-	hp.extern_fun = (DWORD)SpecialHookWillPlus;
+	hp.extern_fun = SpecialHookWillPlus;
 	hp.type = USING_STRING | EXTERN_HOOK;
 	NewHook(hp,L"WillPlus");
 	//RegisterEngineType(ENGINE_WILLPLUS);
@@ -2584,7 +2587,7 @@ bool InsertRyokuchaDynamicHook(LPVOID addr, DWORD frame, DWORD stack)
 		HookParam hp = {};
 		hp.addr = insert_addr;
 		hp.length_offset = 1;
-		hp.extern_fun = (DWORD)SpecialHookRyokucha;	
+		hp.extern_fun = SpecialHookRyokucha;	
 		hp.type = BIG_ENDIAN | EXTERN_HOOK;	
 		NewHook(hp, L"StudioRyokucha");
 	}
@@ -2740,7 +2743,7 @@ void InsertAnex86Hook()
 			if (*(DWORD*)(i + 4) == inst[1])
 			{
 				hp.addr = i;
-				hp.extern_fun = (DWORD)SpecialHookAnex86;
+				hp.extern_fun = SpecialHookAnex86;
 				hp.type = EXTERN_HOOK;
 				hp.length_offset = 1;
 				NewHook(hp, L"Anex86");
@@ -2750,13 +2753,14 @@ void InsertAnex86Hook()
 	}
 	OutputConsole(L"Unknown Anex86 engine.");
 }
-static char* ShinyDaysStackString[0x10];
-static int ShinyDaysStackStringLen[0x10];
-static int ShinyDaysStackIndex;
+//static char* ShinyDaysQueueString[0x10];
+//static int ShinyDaysQueueStringLen[0x10];
+//static int ShinyDaysQueueIndex, ShinyDaysQueueNext;
+static int ShinyDaysQueueStringLen;
 void SpecialHookShinyDays(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* split, DWORD* len)
 {
 	LPWSTR fun_str;
-	char *buffer_str, *text_str;
+	char *text_str;
 	DWORD l = 0;
 	__asm
 	{
@@ -2779,29 +2783,13 @@ _no_text:
 	}
 	if (memcmp(fun_str,L"[PlayVoice]",0x18) == 0)
 	{
-		if (ShinyDaysStackIndex > 0)
-		{
-			ShinyDaysStackIndex--;
-			buffer_str = ShinyDaysStackString[ShinyDaysStackIndex];
-			ShinyDaysStackString[ShinyDaysStackIndex] = 0;
-			l = ShinyDaysStackStringLen[ShinyDaysStackIndex];
-			memcpy(text_buffer, buffer_str, l);
-			*data = (DWORD)text_buffer;
-			*len = l;
-			delete buffer_str;
-		}
-		return;
+		*data = (DWORD)text_buffer;
+		*len = ShinyDaysQueueStringLen;
 	}
-	if (memcmp(fun_str,L"[PrintText]",0x18) == 0)
+	else if (memcmp(fun_str,L"[PrintText]",0x18) == 0)
 	{
-		if (l && ShinyDaysStackIndex < 0x10)
-		{
-			buffer_str = new char[l];
-			memcpy(buffer_str, text_str, l);
-			ShinyDaysStackString[ShinyDaysStackIndex] = buffer_str;
-			ShinyDaysStackStringLen[ShinyDaysStackIndex] = l;
-			ShinyDaysStackIndex++;
-		}
+		memcpy(text_buffer, text_str, l);
+		ShinyDaysQueueStringLen = l;
 	}
 }
 void InsertShinyDaysHook()
@@ -2818,7 +2806,7 @@ void InsertShinyDaysHook()
 	}
 	HookParam hp = {};
 	hp.addr = 0x42ad9c;
-	hp.extern_fun = (DWORD)SpecialHookShinyDays;
+	hp.extern_fun = SpecialHookShinyDays;
 	hp.type = USING_UNICODE | USING_STRING| EXTERN_HOOK | NO_CONTEXT;
 	NewHook(hp, L"ShinyDays 1.00");
 	return;
@@ -2896,20 +2884,16 @@ DWORD DetermineEngineByFile1()
 		InsertAtelierHook();
 		return 0;
 	}
-
-	if (IthCheckFile(L"advdata\\voice.dat"))
+	if (IthCheckFile(L"advdata\\dat\\names.dat"))
 	{
-		if (IthCheckFile(L"advdata\\dat\\names.dat"))
-			InsertCircusHook();			
-		else
-			InsertCircusHook2();
+		InsertCircusHook();		
 		return 0;
 	}
-	/*if (IthFindFile(L"*.war"))
+	if (IthCheckFile(L"advdata\\grp\\names.dat"))
 	{
-		if (InsertShinaHook())
-			return 0;
-	}*/
+		InsertCircusHook2();
+		return 0;
+	}
 	if (IthFindFile(L"*.noa"))
 	{
 		InsertCotophaHook();
@@ -2926,11 +2910,6 @@ DWORD DetermineEngineByFile1()
 		return 0;
 	}
 
-	/*if (IthFindFile(L"data.wolf"))
-	{
-		InsertWolfHook();
-		return 0;
-	}*/
 	return 1;
 }
 DWORD DetermineEngineByFile2()
@@ -3027,7 +3006,6 @@ DWORD DetermineEngineByFile3()
 		InsertTriangleHook();
 		return 0;
 	}
-	//if (IthFindFile(L"pencil*.mpg"))
 	if (IthCheckFile(L"PSetup.exe"))
 	{
 		InsertPensilHook();
@@ -3064,7 +3042,6 @@ DWORD DetermineEngineByFile4()
 	}
 	if (IthFindFile(L"*.tac"))
 	{
-		//IthBreak();
 		InsertTanukiHook();
 		return 0;
 	}

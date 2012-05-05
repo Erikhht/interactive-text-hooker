@@ -1548,8 +1548,8 @@ void HookWindow::ResetDlgHooks(DWORD pid, HookParam& hp)
 		{
 			if (hks[i].Address()==0) continue;
 			ptr = str;
-			ptr += swprintf(ptr, L"%4d:0x%08X:", pid, hks[i].Address());
-			GetHookNameByIndex(ptr, pid, i);
+			ptr += swprintf(ptr, L"%4d:0x%08X:", record[j].pid_register, hks[i].Address());
+			GetHookNameByIndex(ptr, record[j].pid_register, i);
 			//GetHookString(str, record[j].pid_register, index -> Address(), index -> Type());
 			if (SendMessage(hCombo, CB_FINDSTRING, 0, (LPARAM)str)==CB_ERR)
 				k = SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)str);
@@ -1676,12 +1676,16 @@ void ProcessWindow::RefreshProcess()
 			PROCESS_VM_WRITE | PROCESS_VM_OPERATION, &attr, &id)))
 		{
 			if (flag64)
+			{
 				if (NT_SUCCESS(NtQueryInformationProcess(hProcess, ProcessWow64Information, &wow64, 4, 0)))
+				{
 					if (wow64 == 0) 
 					{
 						NtClose(hProcess);
 						continue;
 					}
+				}
+			}
 			stk.push_back(hProcess);
 			swprintf(pwcBuffer, L"%d", spiProcessInfo -> dUniqueProcessId);
 			item.lParam = spiProcessInfo -> dUniqueProcessId;
