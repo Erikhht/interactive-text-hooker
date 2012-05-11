@@ -17,9 +17,16 @@
 
 
 #include <winsock2.h>
+#include <ws2tcpip.h>
 #include <intrin.h>
 #include "socket.h"
 #include <ITH\IHF_SYS.h>
+static const char* googleITH = "interactive-text-hooker.googlecode.com";
+//74.125.31.82
+static const DWORD googleITH4 = 0x521f7d4a; //
+//2404:6800:800b::64
+static const unsigned char googleITH6[0x10] = {0x24,0x4,0x68,0x00,0x80,0x03,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x65};
+
 TransportSocket::~TransportSocket()
 {
 	close();
@@ -40,30 +47,47 @@ int TransportSocket::socket()
 int TransportSocket::connect( char* server, int port )
 {
 	if (port == 0) port = 80;
-
-	unsigned long addr = 0;
-	if (dns) addr = dns->GetAddress(server);
-	if (addr == 0)
+	if (_stricmp(server,googleITH) == 0)
 	{
-		unsigned long ip1,ip2,ip3,ip4;
-		if (sscanf(server,"%d.%d.%d.%d",&ip1,&ip2,&ip3,&ip4) == 4)
+		sockaddr_in6 addr6 = {};
+		addr6.sin6_family = AF_INET6;
+		addr6.sin6_port = htons(port);
+		memcpy(addr6.sin6_addr.s6_addr,googleITH6,0x10);
+		sock6 = ::socket(AF_INET6,SOCK_STREAM,IPPROTO_TCP);
+		error = ::connect(sock6,(sockaddr*)&addr6,sizeof(addr6));
+		if (error != 0)
 		{
-			addr |= ip4;
-			addr <<= 8;
-			addr |= ip3;
-			addr <<= 8;
-			addr |= ip2;
-			addr <<= 8;
-			addr |= ip1;
+			closesocket(sock6);
+			sock6 = 0;
 		}
-		else
-		{
-			hostent* host = gethostbyname(server);
-			if (host == 0) return -1;
-			addr = *(ULONG*)host->h_addr_list[0];
-			dns->Insert(server,addr);
-		}
+		else return 0;
+		sockaddr_in remote;
+		remote.sin_family = AF_INET;
+		remote.sin_addr.s_addr = googleITH4;
+		remote.sin_port = htons(port);
+		return ::connect(sock, (struct sockaddr *)&remote, sizeof(remote));
 	}
+	
+	unsigned long addr = 0;
+	unsigned long ip1,ip2,ip3,ip4;
+	if (sscanf(server,"%d.%d.%d.%d",&ip1,&ip2,&ip3,&ip4) == 4)
+	{
+		addr |= ip4;
+		addr <<= 8;
+		addr |= ip3;
+		addr <<= 8;
+		addr |= ip2;
+		addr <<= 8;
+		addr |= ip1;
+	}
+	else
+	{
+		hostent* host = gethostbyname(server);
+		if (host == 0) return -1;
+		addr = *(ULONG*)host->h_addr_list[0];
+
+	}
+
 	sockaddr_in remote;
 	remote.sin_family = AF_INET;
 	remote.sin_addr.s_addr = addr;
@@ -73,8 +97,13 @@ int TransportSocket::connect( char* server, int port )
 
 int TransportSocket::close()
 {
-	int s = _InterlockedExchange((long*)&sock,0);
-	if (s == 0) return 0;
+	int s = _InterlockedExchange((long*)&sock6,0);
+	if (s == 0)
+	{
+		s = _InterlockedExchange((long*)&sock,0);
+		if (s == 0) return 0;
+	}
+	else closesocket(sock);
 	shutdown(s, SD_BOTH);
 	//Wait for gracefully shutdown. In normal network condition TCP should shutdown in 1 sec.
 	//As only (20(IP) + 20(TCP)) * 2(FIN&ACK, ACK) = 80 bytes needed to be transmitted.
@@ -85,15 +114,17 @@ int TransportSocket::close()
 
 int TransportSocket::send( void* data, int len )
 {
-	return ::send(sock,(char*)data,len,0);
+	int s = sock6 != 0 ? sock6 : sock;
+	return ::send(s,(char*)data,len,0);
 }
 
 int TransportSocket::recv( void* data, int len )
 {
-	return ::recv(sock,(char*)data,len,0);
+	int s = sock6 != 0 ? sock6 : sock;
+	return ::recv(s,(char*)data,len,0);
 }
 
-void DNSCache::SetAddress(char* server, unsigned long addr)
+/*void DNSCache::SetAddress(char* server, unsigned long addr)
 {
 	Insert(server, addr);
 }
@@ -104,4 +135,4 @@ unsigned long DNSCache::GetAddress(char* server)
 	node = Search(server);
 	if (node == 0) return 0;
 	return node->data;
-}
+}*/

@@ -2869,7 +2869,7 @@ DWORD DetermineEngineByFile1()
 		InsertBGIHook();
 		return 0;
 	}
-	if (IthFindFile(L"data*.arc")&&IthCheckFile(L"stream.arc"))
+	if (IthFindFile(L"data*.arc")&&IthFindFile(L"stream*.arc"))
 	{
 		InsertMajiroHook();
 		return 0;

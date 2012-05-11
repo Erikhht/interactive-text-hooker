@@ -25,16 +25,16 @@
 class TransportSocket
 {
 public:
-	TransportSocket() : sock(0), type(0), error(0), status(0) {}
+	TransportSocket() : sock(0), sock6(0), error(0), status(0) {}
 	virtual ~TransportSocket();
 	virtual int socket();
 	virtual int connect(char* server, int port);
 	virtual int close();
 	virtual int send(void* data, int len);
 	virtual int recv(void* data, int len);
-	inline int Type() {return type;}
+	//inline int Type() {return type;}
 protected:
-	int sock, type, error, status;
+	int sock, sock6, error, status;
 };
 #endif
 
@@ -89,12 +89,18 @@ protected:
 	void* param_buffer;
 };
 
-class DNSCache : public AVLTree<char,unsigned long,SCMP,SCPY,SLEN>
+/*class DNSCache : public AVLTree<char,unsigned long,SCMP,SCPY,SLEN>
 {
 public:
 	void SetAddress(char* server, unsigned long addr);
 	unsigned long GetAddress(char* server);
-};
 
-extern DNSCache *dns;
+};
+class DNSCache6 : public AVLTree<char,char*,SCMP,SCPY,SLEN>
+{
+public:
+	void SetAddress(char* server, char* addr);
+	char* GetAddress(char* server);
+};
+extern DNSCache *dns;*/
 #endif

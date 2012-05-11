@@ -232,7 +232,7 @@ SecureSocket::SecureSocket()
 	transfer_buffer = AllocateMemory(buffer_size);
 	memset(&rcb,0,sizeof(rcb));
 	//status = 0;
-	type = 1;
+	//type = 1;
 }
 SecureSocket::~SecureSocket()
 {

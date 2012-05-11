@@ -25,9 +25,8 @@
 //#include "tls.h"
 #include <ITH\mem.h>
 HANDLE hHeap;
-DNSCache* dns;
-static const char* DNSInitTableName[] = {"interactive-text-hooker.googlecode.com"};
-static const DWORD DNSInitTableAddr[] = {0x52477d4a};
+//DNSCache* dns;
+
 BOOL WINAPI DllMain(HANDLE hModule, DWORD reason, LPVOID lpReserved)
 {
 	switch(reason)
@@ -51,14 +50,14 @@ ITH_TLS_SERVICE DWORD ITH_TLS_API ITH_TLS_Init()
 {
 	WSADATA wsa;
 	WSAStartup(MAKEWORD(2,2),&wsa);
-	dns = new DNSCache;
-	dns->Insert(DNSInitTableName[0],DNSInitTableAddr[0]);
+	//dns = new DNSCache;
+	//dns->Insert(DNSInitTableName[0],DNSInitTableAddr[0]);
 	return 0;
 }
 ITH_TLS_SERVICE DWORD ITH_TLS_API ITH_TLS_Cleanup()
 {
-	delete dns;
-	dns = 0;
+	//delete dns;
+	//dns = 0;
 	WSACleanup();
 	return 0;
 }
