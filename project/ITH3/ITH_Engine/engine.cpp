@@ -891,7 +891,13 @@ void InsertAtelierHook()
 	//FillRange(process_name,&base,&size);
 	//size=size-base;
 	sig=0x40C683; //add esi,0x40
-	i=module_base+SearchPattern(module_base,module_limit-module_base,&sig,3);
+	//i=module_base+SearchPattern(module_base,module_limit-module_base,&sig,3);
+	for (i = module_base; i < module_limit - 4; i++)
+	{
+		sig = *(DWORD*)i & 0xFFFFFF;
+		if (0x40C683 == sig) break;
+	}
+	if (i < module_limit - 4)
 	for (j=i-0x200;i>j;i--)
 	{
 		if (*(DWORD*)i==0xFF6ACCCC) //Find the function entry
@@ -2513,6 +2519,7 @@ void SpecialHookWillPlus(DWORD esp_base, HookParam* hp, DWORD* data, DWORD* spli
 void InsertWillPlusHook()
 {
 	HookParam hp = {};
+	//__debugbreak();
 	hp.addr = FindCallAndEntryAbs((DWORD)GetGlyphOutlineA,module_limit-module_base,module_base,0xEC81);
 	if (hp.addr == 0)
 	{
