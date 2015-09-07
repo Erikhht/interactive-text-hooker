@@ -7,16 +7,14 @@ Current stable version is 2.3. 3.0 is now in testing and debugging process. Deve
 
 ##Features:
 
-* attach to/detach from target process dynamically
+* Attach to/detach from target process dynamically.
+* Insert/modify/remove hook dynamically.
+* Detect many common game engine.
+* Save actions to profile and automatically perform in the future.
+* A flexible thread linking mechanism.
+* Detect and remove single character repetition.
+* On demand suppress repetition.
 
-* insert/modify/remove hook dynamically
-
-* detect many common game engine
-
-* save actions to profile and automatically perform in the future
-
-* a flexible thread linking mechanism
-
-* detect and remove single character repetition
-
-* on demand suppress repetition
+## Discussion
+* [Official discussion group](https://groups.google.com/forum/?fromgroups#!forum/interactive-text-hooker)
+* [English official thread](http://www.hongfire.com/forum/showthread.php/208860)
