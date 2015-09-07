@@ -5,6 +5,9 @@ Interactive Text Hooker (ITH) is a tool to help you extract text from Japanese g
 
 Current stable version is 2.3. 3.0 is now in testing and debugging process. Developers and expert users can download the ITH_Uploader and keep up with the latest version. Common users are recommended to wait for stable version.
 
+## Code license
+[GNU GPL v3](http://www.gnu.org/licenses/gpl.html)
+
 ##Features:
 
 * Attach to/detach from target process dynamically.
